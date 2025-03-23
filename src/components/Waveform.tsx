@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { AudioMarker } from "@/hooks/useAudio";
 
@@ -22,12 +22,13 @@ export const Waveform = ({
   const [isDragging, setIsDragging] = useState(false);
   const [hoverTime, setHoverTime] = useState<number | null>(null);
   
-  // Generate random waveform data for visualization
-  // In a real implementation, this would be actual audio data analysis
+  // Generate random waveform data but only once when duration changes
+  // Reduced number of points from 100 to 50 to decrease memory usage
   useEffect(() => {
     if (duration <= 0) return;
     
-    const data = Array.from({ length: 100 }, () => Math.random() * 0.8 + 0.2);
+    // Generate fewer data points to reduce memory consumption
+    const data = Array.from({ length: 50 }, () => Math.random() * 0.8 + 0.2);
     setWaveformData(data);
   }, [duration]);
   
@@ -39,7 +40,7 @@ export const Waveform = ({
     markers.find(marker => marker.type === 'end'),
   [markers]);
   
-  const handleWaveformClick = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleWaveformClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (duration <= 0) return;
     
     const container = e.currentTarget;
@@ -48,9 +49,9 @@ export const Waveform = ({
     const seekTime = position * duration;
     
     onSeek(seekTime);
-  };
+  }, [duration, onSeek]);
   
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (duration <= 0) return;
     
     const container = e.currentTarget;
@@ -63,30 +64,30 @@ export const Waveform = ({
     if (isDragging) {
       onSeek(time);
     }
-  };
+  }, [duration, isDragging, onSeek]);
   
-  const handleMouseDown = () => {
+  const handleMouseDown = useCallback(() => {
     setIsDragging(true);
-  };
+  }, []);
   
-  const handleMouseUp = () => {
+  const handleMouseUp = useCallback(() => {
     setIsDragging(false);
-  };
+  }, []);
   
-  const handleMouseLeave = () => {
+  const handleMouseLeave = useCallback(() => {
     setHoverTime(null);
     setIsDragging(false);
-  };
+  }, []);
   
   // Format time for display
-  const formatTime = (time: number) => {
+  const formatTime = useCallback((time: number) => {
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-  };
+  }, []);
 
   return (
-    <div className="relative w-full h-40 glass-panel rounded-lg p-4 overflow-hidden">
+    <div className="relative w-full h-32 glass-panel rounded-lg p-4 overflow-hidden">
       <div 
         className="relative w-full h-full"
         onMouseMove={handleMouseMove}
@@ -128,8 +129,8 @@ export const Waveform = ({
           style={{ left: `${(currentTime / duration) * 100}%` }}
         />
         
-        {/* Waveform visualization */}
-        <div className="flex items-end h-full w-full gap-[2px]">
+        {/* Simplified waveform visualization with fewer bars */}
+        <div className="flex items-end h-full w-full gap-[3px]">
           {waveformData.map((value, index) => {
             const position = (index / waveformData.length) * duration;
             const isActive = position <= currentTime;
@@ -150,14 +151,14 @@ export const Waveform = ({
                 )}
                 style={{ 
                   height,
-                  animationDelay: `${index * 0.01}s`
+                  // Removed animation delay to reduce performance impact
                 }}
               />
             );
           })}
         </div>
         
-        {/* Time tooltip on hover */}
+        {/* Time tooltip on hover - only show when actually hovering */}
         {hoverTime !== null && (
           <div 
             className="absolute bottom-full mb-2 bg-black/80 text-white px-2 py-1 rounded text-xs transform -translate-x-1/2 pointer-events-none shadow-md"

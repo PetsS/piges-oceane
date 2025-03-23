@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useCallback, memo } from "react";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { 
@@ -25,7 +25,8 @@ interface AudioPlayerProps {
   audioTitle?: string;
 }
 
-export const AudioPlayer = ({
+// Use memo to prevent unnecessary re-renders
+export const AudioPlayer = memo(({
   isPlaying,
   currentTime,
   duration,
@@ -40,23 +41,23 @@ export const AudioPlayer = ({
   
   const playbackPercentage = duration > 0 ? (currentTime / duration) * 100 : 0;
   
-  const handleSkipBack = () => {
+  const handleSkipBack = useCallback(() => {
     onSeek(Math.max(0, currentTime - 10));
-  };
+  }, [currentTime, onSeek]);
   
-  const handleSkipForward = () => {
+  const handleSkipForward = useCallback(() => {
     onSeek(Math.min(duration, currentTime + 10));
-  };
+  }, [currentTime, duration, onSeek]);
   
-  const handleVolumeIconClick = () => {
-    setShowVolumeSlider(!showVolumeSlider);
-  };
+  const handleVolumeIconClick = useCallback(() => {
+    setShowVolumeSlider(prev => !prev);
+  }, []);
   
-  const getVolumeIcon = () => {
+  const getVolumeIcon = useCallback(() => {
     if (volume === 0) return <VolumeX className="h-5 w-5" />;
     if (volume < 0.5) return <Volume1 className="h-5 w-5" />;
     return <Volume2 className="h-5 w-5" />;
-  };
+  }, [volume]);
 
   return (
     <div className="glass-panel rounded-lg p-4 animate-fade-in">
@@ -85,7 +86,7 @@ export const AudioPlayer = ({
             </Button>
             
             {showVolumeSlider && (
-              <div className="absolute -left-8 bottom-12 bg-background/90 backdrop-blur-sm p-3 rounded-md shadow-md border flex items-center w-24 hover:w-28 transition-all duration-300 animate-fade-in">
+              <div className="absolute -left-8 bottom-12 bg-background/90 backdrop-blur-sm p-3 rounded-md shadow-md border flex items-center w-24 transition-all duration-300 animate-fade-in">
                 <Slider
                   value={[volume * 100]}
                   min={0}
@@ -155,4 +156,6 @@ export const AudioPlayer = ({
       </div>
     </div>
   );
-};
+});
+
+AudioPlayer.displayName = "AudioPlayer";

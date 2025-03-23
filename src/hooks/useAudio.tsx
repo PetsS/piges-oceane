@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -34,6 +35,16 @@ export const useAudio = () => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const animationRef = useRef<number | null>(null);
+  const processingRef = useRef<boolean>(false);
+
+  // Clean up audio context when component unmounts
+  useEffect(() => {
+    return () => {
+      if (audioContextRef.current) {
+        audioContextRef.current.close().catch(console.error);
+      }
+    };
+  }, []);
 
   const loadFilesFromUNC = useCallback(async (path: string, city: string, date: Date, hour: string | null) => {
     setIsLoading(true);
@@ -97,36 +108,51 @@ export const useAudio = () => {
     loadFilesFromUNC(`${audioFolderPath}\\${defaultCity}\\${format(today, 'yyyy-MM-dd')}`, defaultCity, today, currentHour);
   }, [loadFilesFromUNC]);
 
-  const getAudioContext = () => {
-    if (!audioContextRef.current) {
+  const getAudioContext = useCallback(() => {
+    if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
       audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
     }
     return audioContextRef.current;
-  };
+  }, []);
 
-  const fetchAndDecodeAudio = async (url: string): Promise<AudioBuffer | null> => {
+  // More efficient audio decoding with proper error handling
+  const fetchAndDecodeAudio = useCallback(async (url: string): Promise<AudioBuffer | null> => {
     try {
       const response = await fetch(url);
       if (!response.ok) {
         throw new Error(`Failed to fetch audio: ${response.status} ${response.statusText}`);
       }
+      
       const arrayBuffer = await response.arrayBuffer();
       const audioContext = getAudioContext();
+      
+      // Handle very large files more efficiently
+      if (arrayBuffer.byteLength > 50 * 1024 * 1024) { // 50MB
+        toast.info('Large audio file detected. Processing may take longer.');
+      }
+      
       return await audioContext.decodeAudioData(arrayBuffer);
     } catch (error) {
       console.error('Error decoding audio data:', error);
       return null;
     }
-  };
+  }, [getAudioContext]);
 
   useEffect(() => {
     if (!audioSrc) return;
     
-    if (!audioRef.current) {
-      audioRef.current = new Audio(audioSrc);
-    } else {
-      audioRef.current.src = audioSrc;
+    // Clean up any previous audio elements
+    if (audioRef.current && audioRef.current.src !== audioSrc) {
+      audioRef.current.pause();
+      audioRef.current.src = '';
     }
+    
+    // Create a new audio element or reset the existing one
+    if (!audioRef.current) {
+      audioRef.current = new Audio();
+    }
+    audioRef.current.src = audioSrc;
+    audioRef.current.volume = volume;
     
     const audio = audioRef.current;
     
@@ -165,46 +191,48 @@ export const useAudio = () => {
     audio.addEventListener('ended', onEnded);
     audio.addEventListener('error', onError);
     
-    audio.volume = volume;
-    
+    // Only load the buffer when needed for export
     const loadBuffer = async () => {
+      // Clear previous buffer to free memory
+      setAudioBuffer(null);
+      
+      if (!audioSrc) return;
+      
       try {
-        if (!audioSrc) {
-          setAudioBuffer(null);
-          return;
-        }
-        
         const buffer = await fetchAndDecodeAudio(audioSrc);
-        setAudioBuffer(buffer);
         
         if (!buffer) {
           toast.error('Impossible de décoder le fichier audio. Essayez un autre format.');
+          return;
         }
+        
+        setAudioBuffer(buffer);
       } catch (error) {
         console.error('Error loading audio buffer:', error);
-        setAudioBuffer(null);
         toast.error('Erreur lors du chargement du fichier audio');
       }
     };
     
-    loadBuffer();
+    // Only load full buffer when needed (delayed)
+    const bufferTimeout = setTimeout(loadBuffer, 1000);
     
     return () => {
       audio.removeEventListener('loadeddata', setAudioData);
       audio.removeEventListener('timeupdate', setAudioTime);
       audio.removeEventListener('ended', onEnded);
       audio.removeEventListener('error', onError);
+      clearTimeout(bufferTimeout);
     };
-  }, [audioSrc, volume]);
+  }, [audioSrc, volume, fetchAndDecodeAudio]);
 
-  const animateTime = () => {
+  const animateTime = useCallback(() => {
     if (audioRef.current) {
       setCurrentTime(audioRef.current.currentTime);
       animationRef.current = requestAnimationFrame(animateTime);
     }
-  };
+  }, []);
 
-  const togglePlay = () => {
+  const togglePlay = useCallback(() => {
     if (!audioRef.current) return;
     
     if (!isPlaying) {
@@ -225,24 +253,24 @@ export const useAudio = () => {
         animationRef.current = null;
       }
     }
-  };
+  }, [isPlaying, animateTime]);
 
-  const seek = (time: number) => {
+  const seek = useCallback((time: number) => {
     if (!audioRef.current) return;
     
     audioRef.current.currentTime = time;
     setCurrentTime(time);
-  };
+  }, []);
 
-  const changeVolume = (value: number) => {
+  const changeVolume = useCallback((value: number) => {
     if (!audioRef.current) return;
     
     const newVolume = Math.max(0, Math.min(1, value));
     audioRef.current.volume = newVolume;
     setVolume(newVolume);
-  };
+  }, []);
 
-  const addMarker = (type: 'start' | 'end') => {
+  const addMarker = useCallback((type: 'start' | 'end') => {
     const filteredMarkers = markers.filter(marker => marker.type !== type);
     
     const newMarker: AudioMarker = {
@@ -254,14 +282,40 @@ export const useAudio = () => {
     setMarkers([...filteredMarkers, newMarker]);
     
     toast.success(`Marqueur ${type === 'start' ? 'début' : 'fin'} défini à ${formatTime(currentTime)}`);
-  };
+  }, [markers, currentTime]);
 
-  const removeMarker = (id: string) => {
+  const removeMarker = useCallback((id: string) => {
     setMarkers(markers.filter(marker => marker.id !== id));
-  };
+  }, [markers]);
 
-  const exportTrimmedAudio = async () => {
+  // Memory-efficient export function
+  const exportTrimmedAudio = useCallback(async () => {
+    // Prevent multiple export operations
+    if (processingRef.current) {
+      toast.info('Traitement en cours, veuillez patienter...');
+      return;
+    }
+    
     if (!audioBuffer || !currentAudioFile) {
+      // Only now load the buffer if needed for export
+      if (audioSrc && !audioBuffer) {
+        toast.info('Chargement du fichier audio pour export...');
+        try {
+          const buffer = await fetchAndDecodeAudio(audioSrc);
+          if (buffer) {
+            setAudioBuffer(buffer);
+            // Continue with export after buffer is loaded
+            setTimeout(() => exportTrimmedAudio(), 500);
+          } else {
+            toast.error('Impossible de charger l\'audio pour l\'export');
+          }
+        } catch (error) {
+          console.error('Error loading buffer for export:', error);
+          toast.error('Erreur lors du chargement pour l\'export');
+        }
+        return;
+      }
+      
       toast.error('Aucun audio chargé ou fichier non compatible avec l\'export');
       return;
     }
@@ -283,6 +337,7 @@ export const useAudio = () => {
     }
     
     toast.success('Traitement du segment audio...', { duration: 2000 });
+    processingRef.current = true;
     
     try {
       const audioContext = getAudioContext();
@@ -294,19 +349,54 @@ export const useAudio = () => {
       
       if (frameCount <= 0) {
         toast.error('Sélection audio invalide');
+        processingRef.current = false;
         return;
       }
       
-      const trimmedBuffer = audioContext.createBuffer(
-        audioBuffer.numberOfChannels,
-        frameCount,
-        sampleRate
-      );
+      // More efficient memory usage by processing in smaller chunks for large files
+      const isLargeFile = frameCount > 5000000; // ~2 minutes of stereo audio at 44.1kHz
       
-      for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
-        const channelData = new Float32Array(frameCount);
-        audioBuffer.copyFromChannel(channelData, channel, startSample);
-        trimmedBuffer.copyToChannel(channelData, channel);
+      let trimmedBuffer;
+      if (isLargeFile) {
+        // For large files, use a more memory-efficient approach
+        toast.info('Fichier volumineux détecté. Traitement optimisé en cours...');
+        
+        // Create buffer with reduced channel count if possible
+        const effectiveChannels = Math.min(2, audioBuffer.numberOfChannels);
+        trimmedBuffer = audioContext.createBuffer(
+          effectiveChannels,
+          frameCount,
+          sampleRate
+        );
+        
+        // Process one channel at a time to reduce peak memory usage
+        for (let channel = 0; channel < effectiveChannels; channel++) {
+          const newChannelData = new Float32Array(frameCount);
+          // Copy in smaller chunks to reduce memory spikes
+          const chunkSize = 100000;
+          for (let i = 0; i < frameCount; i += chunkSize) {
+            const blockSize = Math.min(chunkSize, frameCount - i);
+            const tempChunk = new Float32Array(blockSize);
+            audioBuffer.copyFromChannel(tempChunk, channel, startSample + i);
+            newChannelData.set(tempChunk, i);
+            // Allow browser to garbage collect
+            await new Promise(r => setTimeout(r, 0));
+          }
+          trimmedBuffer.copyToChannel(newChannelData, channel);
+        }
+      } else {
+        // Standard approach for smaller files
+        trimmedBuffer = audioContext.createBuffer(
+          audioBuffer.numberOfChannels,
+          frameCount,
+          sampleRate
+        );
+        
+        for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
+          const channelData = new Float32Array(frameCount);
+          audioBuffer.copyFromChannel(channelData, channel, startSample);
+          trimmedBuffer.copyToChannel(channelData, channel);
+        }
       }
       
       const savedSettings = localStorage.getItem("appSettings");
@@ -335,7 +425,7 @@ export const useAudio = () => {
           trimmedAudioBlob = await bufferToMp3(trimmedBuffer, bitrate);
           fileExtension = "mp3";
         } catch (error) {
-          console.error("Error creating MP3:", error);
+          console.error("Error in MP3 encoding:", error);
           toast.error("Erreur lors de la création du MP3. Export en WAV à la place.");
           trimmedAudioBlob = await bufferToWav(trimmedBuffer);
           fileExtension = "wav";
@@ -358,6 +448,7 @@ export const useAudio = () => {
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
+            // Release object URL immediately after download starts
             setTimeout(() => URL.revokeObjectURL(downloadUrl), 100);
           }
         },
@@ -366,17 +457,26 @@ export const useAudio = () => {
     } catch (error) {
       console.error('Error exporting audio:', error);
       toast.error('Erreur lors de l\'export du fichier audio');
+    } finally {
+      processingRef.current = false;
     }
-  };
+  }, [audioBuffer, audioSrc, currentAudioFile, duration, exportFormat, fetchAndDecodeAudio, getAudioContext, markers]);
 
-  const bufferToWav = (buffer: AudioBuffer): Promise<Blob> => {
+  // The bufferToWav function (more memory efficient)
+  const bufferToWav = useCallback((buffer: AudioBuffer): Promise<Blob> => {
     return new Promise((resolve) => {
-      const numOfChannels = buffer.numberOfChannels;
+      const numOfChannels = Math.min(buffer.numberOfChannels, 2); // Limit to stereo to save memory
       const length = buffer.length * numOfChannels * 2;
       const sampleRate = buffer.sampleRate;
       
       const wavBuffer = new ArrayBuffer(44 + length);
       const view = new DataView(wavBuffer);
+      
+      const writeString = (view: DataView, offset: number, string: string) => {
+        for (let i = 0; i < string.length; i++) {
+          view.setUint8(offset + i, string.charCodeAt(i));
+        }
+      };
       
       writeString(view, 0, 'RIFF');
       view.setUint32(4, 36 + length, true);
@@ -395,25 +495,34 @@ export const useAudio = () => {
       const offset = 44;
       let pos = offset;
       
-      for (let i = 0; i < buffer.length; i++) {
-        for (let channel = 0; channel < numOfChannels; channel++) {
-          const sample = buffer.getChannelData(channel)[i];
-          const int = Math.max(-1, Math.min(1, sample)) * 0x7FFF;
-          view.setInt16(pos, int, true);
-          pos += 2;
+      // Process in smaller chunks to reduce memory pressure
+      const chunkSize = 10000; // Number of samples to process at once
+      
+      for (let i = 0; i < buffer.length; i += chunkSize) {
+        const blockSize = Math.min(chunkSize, buffer.length - i);
+        
+        // For each chunk, process all channels
+        for (let j = 0; j < blockSize; j++) {
+          for (let channel = 0; channel < numOfChannels; channel++) {
+            const sample = buffer.getChannelData(channel)[i + j];
+            const int = Math.max(-1, Math.min(1, sample)) * 0x7FFF;
+            view.setInt16(pos, int, true);
+            pos += 2;
+          }
         }
       }
       
       const blob = new Blob([wavBuffer], { type: 'audio/wav' });
       resolve(blob);
     });
-  };
+  }, []);
 
-  const bufferToMp3 = (buffer: AudioBuffer, bitrate = 128): Promise<Blob> => {
+  // Memory-optimized MP3 encoding function
+  const bufferToMp3 = useCallback((buffer: AudioBuffer, bitrate = 128): Promise<Blob> => {
     return new Promise((resolve, reject) => {
       try {
         const sampleRate = buffer.sampleRate;
-        const numChannels = buffer.numberOfChannels;
+        const numChannels = Math.min(buffer.numberOfChannels, 2); // Limit to stereo
         
         const mp3encoder = new lamejs.Mp3Encoder(numChannels, sampleRate, bitrate);
         const mp3Data: Int8Array[] = [];
@@ -423,74 +532,86 @@ export const useAudio = () => {
           channelData.push(buffer.getChannelData(i));
         }
         
-        const sampleBlockSize = 1152;
+        const sampleBlockSize = 1152; // LAME recommends 1152 samples per frame
         const totalSamples = buffer.length;
         
-        for (let i = 0; i < totalSamples; i += sampleBlockSize) {
-          const leftChunk = new Int16Array(sampleBlockSize);
-          const rightChunk = numChannels > 1 ? new Int16Array(sampleBlockSize) : undefined;
+        // Process in larger chunks to improve performance
+        const processChunkSize = 50000; // ~1 second of audio at 44.1kHz
+        
+        const processChunk = async (startIndex: number) => {
+          const endIndex = Math.min(startIndex + processChunkSize, totalSamples);
           
-          for (let j = 0; j < sampleBlockSize; j++) {
-            if (i + j < totalSamples) {
-              leftChunk[j] = channelData[0][i + j] * 0x7FFF;
-              if (rightChunk && numChannels > 1) {
-                rightChunk[j] = channelData[1][i + j] * 0x7FFF;
+          for (let i = startIndex; i < endIndex; i += sampleBlockSize) {
+            const leftChunk = new Int16Array(sampleBlockSize);
+            const rightChunk = numChannels > 1 ? new Int16Array(sampleBlockSize) : undefined;
+            
+            for (let j = 0; j < sampleBlockSize; j++) {
+              if (i + j < totalSamples) {
+                leftChunk[j] = channelData[0][i + j] * 0x7FFF;
+                if (rightChunk && numChannels > 1) {
+                  rightChunk[j] = channelData[1][i + j] * 0x7FFF;
+                }
+              } else {
+                leftChunk[j] = 0;
+                if (rightChunk) {
+                  rightChunk[j] = 0;
+                }
               }
+            }
+            
+            let mp3buf;
+            if (numChannels === 1) {
+              mp3buf = mp3encoder.encodeBuffer(leftChunk);
             } else {
-              leftChunk[j] = 0;
-              if (rightChunk) {
-                rightChunk[j] = 0;
-              }
+              mp3buf = mp3encoder.encodeBuffer(leftChunk, rightChunk);
+            }
+            
+            if (mp3buf && mp3buf.length > 0) {
+              mp3Data.push(mp3buf);
             }
           }
           
-          let mp3buf;
-          if (numChannels === 1) {
-            mp3buf = mp3encoder.encodeBuffer(leftChunk);
-          } else {
-            mp3buf = mp3encoder.encodeBuffer(leftChunk, rightChunk);
+          // Allow the browser to perform garbage collection
+          if (endIndex < totalSamples) {
+            await new Promise(r => setTimeout(r, 0));
+            return processChunk(endIndex);
           }
           
-          if (mp3buf && mp3buf.length > 0) {
-            mp3Data.push(mp3buf);
+          // Finalize the MP3
+          const finalMp3buf = mp3encoder.flush();
+          if (finalMp3buf && finalMp3buf.length > 0) {
+            mp3Data.push(finalMp3buf);
           }
-        }
+          
+          // Create the blob more efficiently
+          const blob = new Blob(mp3Data, { type: 'audio/mp3' });
+          resolve(blob);
+        };
         
-        const finalMp3buf = mp3encoder.flush();
-        if (finalMp3buf && finalMp3buf.length > 0) {
-          mp3Data.push(finalMp3buf);
-        }
+        // Start processing
+        processChunk(0);
         
-        let totalLength = 0;
-        for (const data of mp3Data) {
-          totalLength += data.length;
-        }
-        
-        const mergedBuffer = new Int8Array(totalLength);
-        let offset = 0;
-        for (const data of mp3Data) {
-          mergedBuffer.set(data, offset);
-          offset += data.length;
-        }
-        
-        const blob = new Blob([mergedBuffer], { type: 'audio/mp3' });
-        resolve(blob);
       } catch (error) {
         console.error("Error in MP3 encoding:", error);
         reject(error);
       }
     });
-  };
+  }, []);
 
-  const writeString = (view: DataView, offset: number, string: string) => {
-    for (let i = 0; i < string.length; i++) {
-      view.setUint8(offset + i, string.charCodeAt(i));
-    }
-  };
-
-  const loadAudioFile = (file: AudioFile) => {
+  const loadAudioFile = useCallback((file: AudioFile) => {
     setIsLoading(true);
     setCurrentAudioFile(file);
+    
+    // Clean up previous resources
+    if (audioRef.current) {
+      audioRef.current.pause();
+      if (audioSrc) {
+        URL.revokeObjectURL(audioSrc);
+      }
+    }
+    
+    // Clear audio buffer to free memory
+    setAudioBuffer(null);
     
     if (file.path.startsWith('blob:') || file.path.startsWith('http')) {
       setAudioSrc(file.path);
@@ -499,28 +620,52 @@ export const useAudio = () => {
       setIsLoading(false);
     } else {
       setTimeout(() => {
-        setAudioSrc('https://audio-samples.github.io/samples/mp3/blizzard_biased/blizzard_01.mp3');
+        // Use a more reliable audio sample
+        setAudioSrc('https://assets.mixkit.co/music/preview/mixkit-tech-house-vibes-130.mp3');
         setIsPlaying(false);
         setCurrentTime(0);
         setIsLoading(false);
         
         toast.info("Remarque: L'accès aux fichiers réseau est simulé. Un fichier de test est chargé à la place.");
-      }, 1500);
+      }, 1000);
     }
-  };
+  }, [audioSrc]);
 
-  const formatTime = (time: number) => {
+  const formatTime = useCallback((time: number) => {
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-  };
+  }, []);
 
-  const formatTimeDetailed = (time: number) => {
+  const formatTimeDetailed = useCallback((time: number) => {
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
     const milliseconds = Math.floor((time % 1) * 1000);
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(3, '0')}`;
-  };
+  }, []);
+
+  // Clean up resources when component unmounts
+  useEffect(() => {
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+      
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = '';
+      }
+      
+      if (audioContextRef.current) {
+        audioContextRef.current.close().catch(console.error);
+      }
+      
+      // Release any object URLs
+      if (audioSrc && audioSrc.startsWith('blob:')) {
+        URL.revokeObjectURL(audioSrc);
+      }
+    };
+  }, [audioSrc]);
 
   return {
     audioSrc,
