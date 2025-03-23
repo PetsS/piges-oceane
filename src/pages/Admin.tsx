@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -35,6 +34,7 @@ interface Settings {
     accent: string;
   };
   audioFolderPath: string;
+  cities: string[];
 }
 
 const Admin = () => {
@@ -49,14 +49,15 @@ const Admin = () => {
       accent: "hsl(210, 40%, 96%)",
     },
     audioFolderPath: "\\\\server\\audioLogs",
+    cities: ["paris", "lyon", "marseille", "bordeaux"]
   });
   
-  // Password change states
+  const [newCity, setNewCity] = useState("");
+  
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
-  // Check if current user is admin
   useEffect(() => {
     const currentUser = localStorage.getItem("currentUser");
     if (!currentUser || currentUser !== "admin") {
@@ -64,12 +65,10 @@ const Admin = () => {
       navigate("/");
     }
 
-    // Load users from localStorage
     const savedUsers = localStorage.getItem("users");
     if (savedUsers) {
       setUsers(JSON.parse(savedUsers));
     } else {
-      // Initialize with default admin
       const defaultUsers = [
         { username: "admin", password: "password", isAdmin: true }
       ];
@@ -77,12 +76,10 @@ const Admin = () => {
       setUsers(defaultUsers);
     }
 
-    // Load settings
     const savedSettings = localStorage.getItem("appSettings");
     if (savedSettings) {
       setSettings(JSON.parse(savedSettings));
     } else {
-      // Save default settings
       localStorage.setItem("appSettings", JSON.stringify(settings));
     }
   }, []);
@@ -121,7 +118,6 @@ const Admin = () => {
   const handleSaveSettings = () => {
     localStorage.setItem("appSettings", JSON.stringify(settings));
     
-    // Apply the CSS variables for colors in HSL format
     document.documentElement.style.setProperty('--primary', colorToHsl(settings.buttonColors.primary));
     document.documentElement.style.setProperty('--secondary', colorToHsl(settings.buttonColors.secondary));
     document.documentElement.style.setProperty('--accent', colorToHsl(settings.buttonColors.accent));
@@ -155,7 +151,6 @@ const Admin = () => {
     setUsers(updatedUsers);
     localStorage.setItem("users", JSON.stringify(updatedUsers));
     
-    // Reset state
     setSelectedUser(null);
     setNewPassword("");
     setConfirmPassword("");
@@ -163,9 +158,37 @@ const Admin = () => {
     toast.success(`Mot de passe modifié pour ${selectedUser}`);
   };
 
-  // Convert hex or rgb color to HSL format for CSS variables
+  const handleAddCity = () => {
+    if (!newCity.trim()) {
+      toast.error("Veuillez entrer un nom de ville");
+      return;
+    }
+    
+    const cityLower = newCity.trim().toLowerCase();
+    
+    if (settings.cities.includes(cityLower)) {
+      toast.error("Cette ville existe déjà dans la liste");
+      return;
+    }
+    
+    const updatedCities = [...settings.cities, cityLower];
+    setSettings({...settings, cities: updatedCities});
+    setNewCity("");
+    toast.success(`Ville "${newCity}" ajoutée à la liste`);
+  };
+
+  const handleRemoveCity = (city: string) => {
+    if (settings.cities.length <= 1) {
+      toast.error("Vous devez garder au moins une ville dans la liste");
+      return;
+    }
+    
+    const updatedCities = settings.cities.filter(c => c !== city);
+    setSettings({...settings, cities: updatedCities});
+    toast.success(`Ville "${city}" supprimée de la liste`);
+  };
+
   const colorToHsl = (color: string) => {
-    // If it's already in HSL format, extract the values
     if (color.startsWith('hsl')) {
       const match = color.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
       if (match) {
@@ -173,17 +196,14 @@ const Admin = () => {
       }
     }
     
-    // Try to convert hex to HSL
     let r = 0, g = 0, b = 0;
     
-    // Check if it's a hex color
     if (color.startsWith('#')) {
       const hex = color.slice(1);
       r = parseInt(hex.length === 3 ? hex[0] + hex[0] : hex.substring(0, 2), 16);
       g = parseInt(hex.length === 3 ? hex[1] + hex[1] : hex.substring(2, 4), 16);
       b = parseInt(hex.length === 3 ? hex[2] + hex[2] : hex.substring(4, 6), 16);
     } 
-    // Otherwise assume it's RGB
     else if (color.startsWith('rgb')) {
       const match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*\d+(?:\.\d+)?)?\)/);
       if (match) {
@@ -234,11 +254,12 @@ const Admin = () => {
       </div>
       
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="users">Utilisateurs</TabsTrigger>
           <TabsTrigger value="headers">Titres et En-têtes</TabsTrigger>
           <TabsTrigger value="colors">Couleurs</TabsTrigger>
           <TabsTrigger value="folders">Dossiers Audio</TabsTrigger>
+          <TabsTrigger value="cities">Villes</TabsTrigger>
         </TabsList>
         
         <TabsContent value="users" className="space-y-4 mt-6">
@@ -495,6 +516,63 @@ const Admin = () => {
                 
                 <div className="pt-2">
                   <Button onClick={handleSaveSettings}>Enregistrer le chemin</Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="cities" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Gestion des villes</CardTitle>
+              <CardDescription>
+                Configurez les noms des villes correspondant aux dossiers de fichiers audio
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                  <div className="space-y-2">
+                    <Label htmlFor="new-city">Ajouter une nouvelle ville</Label>
+                    <Input 
+                      id="new-city"
+                      value={newCity}
+                      onChange={(e) => setNewCity(e.target.value)}
+                      placeholder="Nom de la ville"
+                    />
+                  </div>
+                  <div className="pt-8">
+                    <Button onClick={handleAddCity}>Ajouter la ville</Button>
+                  </div>
+                </div>
+                
+                <Separator />
+                
+                <div className="space-y-2">
+                  <h3 className="text-lg font-medium">Villes disponibles</h3>
+                  <div className="border rounded-md divide-y">
+                    {settings.cities.map((city) => (
+                      <div key={city} className="p-4 flex justify-between items-center">
+                        <div>
+                          <p className="font-medium">{city.charAt(0).toUpperCase() + city.slice(1)}</p>
+                        </div>
+                        <div className="flex space-x-2">
+                          <Button 
+                            variant="destructive" 
+                            size="sm"
+                            onClick={() => handleRemoveCity(city)}
+                          >
+                            Supprimer
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
+                <div className="pt-2">
+                  <Button onClick={handleSaveSettings}>Enregistrer les modifications</Button>
                 </div>
               </div>
             </CardContent>
