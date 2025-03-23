@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -288,6 +287,96 @@ export const useAudio = () => {
     setMarkers(markers.filter(marker => marker.id !== id));
   }, [markers]);
 
+  // Memory-optimized MP3 encoding function
+  const bufferToMp3 = useCallback((buffer: AudioBuffer, bitrate = 128): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      try {
+        const sampleRate = buffer.sampleRate;
+        const numChannels = Math.min(buffer.numberOfChannels, 2); // Limit to stereo
+        
+        // Initialize LAME encoder with proper settings
+        const mp3encoder = new lamejs.Mp3Encoder(
+          numChannels,  // number of channels (1 for mono, 2 for stereo)
+          sampleRate,   // sample rate (e.g., 44100)
+          bitrate       // bitrate (e.g., 128, 192, 256, 320)
+        );
+        
+        const mp3Data: Int8Array[] = [];
+        
+        // Get channel data
+        const channelData: Float32Array[] = [];
+        for (let i = 0; i < numChannels; i++) {
+          channelData.push(buffer.getChannelData(i));
+        }
+        
+        const sampleBlockSize = 1152; // LAME recommends 1152 samples per frame
+        const totalSamples = buffer.length;
+        
+        // Process in larger chunks to improve performance
+        const processChunkSize = 50000; // ~1 second of audio at 44.1kHz
+        
+        const processChunk = async (startIndex: number) => {
+          const endIndex = Math.min(startIndex + processChunkSize, totalSamples);
+          
+          for (let i = startIndex; i < endIndex; i += sampleBlockSize) {
+            const leftChunk = new Int16Array(sampleBlockSize);
+            const rightChunk = numChannels > 1 ? new Int16Array(sampleBlockSize) : undefined;
+            
+            // Fill with audio data or silence if past the end of file
+            for (let j = 0; j < sampleBlockSize; j++) {
+              if (i + j < totalSamples) {
+                // Scale Float32 [-1,1] to Int16 [-32768,32767]
+                leftChunk[j] = Math.max(-32768, Math.min(32767, channelData[0][i + j] * 32767));
+                if (rightChunk && numChannels > 1) {
+                  rightChunk[j] = Math.max(-32768, Math.min(32767, channelData[1][i + j] * 32767));
+                }
+              } else {
+                leftChunk[j] = 0;
+                if (rightChunk) {
+                  rightChunk[j] = 0;
+                }
+              }
+            }
+            
+            let mp3buf;
+            if (numChannels === 1) {
+              mp3buf = mp3encoder.encodeBuffer(leftChunk);
+            } else {
+              mp3buf = mp3encoder.encodeBuffer(leftChunk, rightChunk);
+            }
+            
+            if (mp3buf && mp3buf.length > 0) {
+              mp3Data.push(mp3buf);
+            }
+          }
+          
+          // Allow the browser to perform garbage collection
+          if (endIndex < totalSamples) {
+            await new Promise(r => setTimeout(r, 0));
+            return processChunk(endIndex);
+          }
+          
+          // Finalize the MP3
+          const finalMp3buf = mp3encoder.flush();
+          if (finalMp3buf && finalMp3buf.length > 0) {
+            mp3Data.push(finalMp3buf);
+          }
+          
+          // Create the blob
+          const blob = new Blob(mp3Data, { type: 'audio/mp3' });
+          resolve(blob);
+        };
+        
+        // Start processing
+        processChunk(0).catch(reject);
+        
+      } catch (error) {
+        console.error("Error in MP3 encoding:", error);
+        reject(error);
+      }
+    });
+  }, []);
+
   // Memory-efficient export function
   const exportTrimmedAudio = useCallback(async () => {
     // Prevent multiple export operations
@@ -399,8 +488,9 @@ export const useAudio = () => {
         }
       }
       
+      // Get the export format - default to MP3 128kbps
       const savedSettings = localStorage.getItem("appSettings");
-      let currentExportFormat = exportFormat;
+      let currentExportFormat: ExportFormat = "mp3-128";
       
       if (savedSettings) {
         try {
@@ -413,23 +503,27 @@ export const useAudio = () => {
         }
       }
       
+      setExportFormat(currentExportFormat);
+      
       let trimmedAudioBlob: Blob;
       let fileExtension: string;
       
-      if (currentExportFormat === "wav") {
-        trimmedAudioBlob = await bufferToWav(trimmedBuffer);
-        fileExtension = "wav";
-      } else {
-        try {
+      // Default to MP3 export with fallback to WAV
+      try {
+        if (currentExportFormat === "wav") {
+          trimmedAudioBlob = await bufferToWav(trimmedBuffer);
+          fileExtension = "wav";
+        } else {
           const bitrate = parseInt(currentExportFormat.split('-')[1]);
           trimmedAudioBlob = await bufferToMp3(trimmedBuffer, bitrate);
           fileExtension = "mp3";
-        } catch (error) {
-          console.error("Error in MP3 encoding:", error);
-          toast.error("Erreur lors de la création du MP3. Export en WAV à la place.");
-          trimmedAudioBlob = await bufferToWav(trimmedBuffer);
-          fileExtension = "wav";
         }
+      } catch (error) {
+        console.error("Error in audio encoding:", error);
+        toast.error("Erreur lors de l'encodage. Export en WAV à la place.");
+        trimmedAudioBlob = await bufferToWav(trimmedBuffer);
+        fileExtension = "wav";
+        currentExportFormat = "wav";
       }
       
       const originalName = currentAudioFile.name.replace(/\.[^/.]+$/, "");
@@ -460,7 +554,7 @@ export const useAudio = () => {
     } finally {
       processingRef.current = false;
     }
-  }, [audioBuffer, audioSrc, currentAudioFile, duration, exportFormat, fetchAndDecodeAudio, getAudioContext, markers]);
+  }, [audioBuffer, audioSrc, currentAudioFile, duration, bufferToWav, fetchAndDecodeAudio, formatTime, getAudioContext, markers]);
 
   // The bufferToWav function (more memory efficient)
   const bufferToWav = useCallback((buffer: AudioBuffer): Promise<Blob> => {
@@ -514,87 +608,6 @@ export const useAudio = () => {
       
       const blob = new Blob([wavBuffer], { type: 'audio/wav' });
       resolve(blob);
-    });
-  }, []);
-
-  // Memory-optimized MP3 encoding function
-  const bufferToMp3 = useCallback((buffer: AudioBuffer, bitrate = 128): Promise<Blob> => {
-    return new Promise((resolve, reject) => {
-      try {
-        const sampleRate = buffer.sampleRate;
-        const numChannels = Math.min(buffer.numberOfChannels, 2); // Limit to stereo
-        
-        const mp3encoder = new lamejs.Mp3Encoder(numChannels, sampleRate, bitrate);
-        const mp3Data: Int8Array[] = [];
-        
-        const channelData: Float32Array[] = [];
-        for (let i = 0; i < numChannels; i++) {
-          channelData.push(buffer.getChannelData(i));
-        }
-        
-        const sampleBlockSize = 1152; // LAME recommends 1152 samples per frame
-        const totalSamples = buffer.length;
-        
-        // Process in larger chunks to improve performance
-        const processChunkSize = 50000; // ~1 second of audio at 44.1kHz
-        
-        const processChunk = async (startIndex: number) => {
-          const endIndex = Math.min(startIndex + processChunkSize, totalSamples);
-          
-          for (let i = startIndex; i < endIndex; i += sampleBlockSize) {
-            const leftChunk = new Int16Array(sampleBlockSize);
-            const rightChunk = numChannels > 1 ? new Int16Array(sampleBlockSize) : undefined;
-            
-            for (let j = 0; j < sampleBlockSize; j++) {
-              if (i + j < totalSamples) {
-                leftChunk[j] = channelData[0][i + j] * 0x7FFF;
-                if (rightChunk && numChannels > 1) {
-                  rightChunk[j] = channelData[1][i + j] * 0x7FFF;
-                }
-              } else {
-                leftChunk[j] = 0;
-                if (rightChunk) {
-                  rightChunk[j] = 0;
-                }
-              }
-            }
-            
-            let mp3buf;
-            if (numChannels === 1) {
-              mp3buf = mp3encoder.encodeBuffer(leftChunk);
-            } else {
-              mp3buf = mp3encoder.encodeBuffer(leftChunk, rightChunk);
-            }
-            
-            if (mp3buf && mp3buf.length > 0) {
-              mp3Data.push(mp3buf);
-            }
-          }
-          
-          // Allow the browser to perform garbage collection
-          if (endIndex < totalSamples) {
-            await new Promise(r => setTimeout(r, 0));
-            return processChunk(endIndex);
-          }
-          
-          // Finalize the MP3
-          const finalMp3buf = mp3encoder.flush();
-          if (finalMp3buf && finalMp3buf.length > 0) {
-            mp3Data.push(finalMp3buf);
-          }
-          
-          // Create the blob more efficiently
-          const blob = new Blob(mp3Data, { type: 'audio/mp3' });
-          resolve(blob);
-        };
-        
-        // Start processing
-        processChunk(0);
-        
-      } catch (error) {
-        console.error("Error in MP3 encoding:", error);
-        reject(error);
-      }
     });
   }, []);
 
@@ -677,6 +690,7 @@ export const useAudio = () => {
     audioFiles,
     isLoading,
     currentAudioFile,
+    exportFormat,
     togglePlay,
     seek,
     changeVolume,
