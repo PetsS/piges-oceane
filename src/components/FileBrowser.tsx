@@ -2,18 +2,25 @@
 import { useState, useEffect } from "react";
 import { AudioFile } from "@/hooks/useAudio";
 import { cn } from "@/lib/utils";
-import { Calendar, Search, Clock, FileAudio } from "lucide-react";
+import { Calendar, Search, Clock, FileAudio, MapPin } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
 import { DatePicker } from "@/components/DatePicker";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
 
 interface FileBrowserProps {
   files: AudioFile[];
   onFileSelect: (file: AudioFile) => void;
   isLoading: boolean;
-  onPathChange: (path: string, date: Date, hour: string | null) => void;
+  onPathChange: (path: string, city: string, date: Date, hour: string | null) => void;
 }
 
 export const FileBrowser = ({
@@ -25,14 +32,20 @@ export const FileBrowser = ({
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedHour, setSelectedHour] = useState<string | null>(null);
   const [audioFolderPath, setAudioFolderPath] = useState("\\\\server\\audioLogs");
+  const [selectedCity, setSelectedCity] = useState<string>("paris");
+  const [availableCities, setAvailableCities] = useState<string[]>(["paris", "lyon", "marseille", "bordeaux"]);
 
-  // Load audio folder path from settings
+  // Load audio folder path and cities from settings
   useEffect(() => {
     const savedSettings = localStorage.getItem("appSettings");
     if (savedSettings) {
       const settings = JSON.parse(savedSettings);
       if (settings.audioFolderPath) {
         setAudioFolderPath(settings.audioFolderPath);
+      }
+      if (settings.cities && Array.isArray(settings.cities) && settings.cities.length > 0) {
+        setAvailableCities(settings.cities);
+        setSelectedCity(settings.cities[0]);
       }
     }
   }, []);
@@ -43,10 +56,10 @@ export const FileBrowser = ({
     // Format date as YYYY-MM-DD for folder structure
     const dateFolder = format(selectedDate, "yyyy-MM-dd");
     
-    // Generate path using the base path, date folder, and optionally the hour file
-    const fullPath = `${audioFolderPath}\\${dateFolder}${selectedHour ? `\\${selectedHour}.mp3` : ''}`;
+    // Generate path using the base path, city folder, date folder, and optionally the hour file
+    const fullPath = `${audioFolderPath}\\${selectedCity}\\${dateFolder}${selectedHour ? `\\${selectedHour}.mp3` : ''}`;
     
-    onPathChange(fullPath, selectedDate, selectedHour);
+    onPathChange(fullPath, selectedCity, selectedDate, selectedHour);
   };
 
   const hours = Array.from({ length: 24 }, (_, i) => 
@@ -57,6 +70,28 @@ export const FileBrowser = ({
     <div className="w-full flex flex-col h-full glass-panel rounded-lg overflow-hidden animate-fade-in">
       <div className="p-4 bg-secondary/50 backdrop-blur-md border-b">
         <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium flex items-center gap-2">
+              <MapPin className="h-4 w-4" />
+              <span>Sélectionner une ville</span>
+            </label>
+            <Select 
+              value={selectedCity} 
+              onValueChange={setSelectedCity}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Sélectionner une ville" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableCities.map((city) => (
+                  <SelectItem key={city} value={city}>
+                    {city.charAt(0).toUpperCase() + city.slice(1)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="space-y-2">
             <label className="text-sm font-medium flex items-center gap-2">
               <Calendar className="h-4 w-4" />

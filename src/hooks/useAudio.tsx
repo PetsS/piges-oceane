@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -25,11 +26,12 @@ export const useAudio = () => {
   const [markers, setMarkers] = useState<AudioMarker[]>([]);
   const [audioFiles, setAudioFiles] = useState<AudioFile[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [currentAudioFile, setCurrentAudioFile] = useState<AudioFile | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const animationRef = useRef<number | null>(null);
 
-  const loadFilesFromUNC = useCallback(async (path: string, date: Date, hour: string | null) => {
+  const loadFilesFromUNC = useCallback(async (path: string, city: string, date: Date, hour: string | null) => {
     setIsLoading(true);
     
     setTimeout(() => {
@@ -38,7 +40,7 @@ export const useAudio = () => {
       if (hour) {
         const mockFile: AudioFile = {
           name: `${hour}.mp3`,
-          path: `\\\\server\\audioLogs\\${dateStr}\\${hour}.mp3`,
+          path: `\\\\server\\audioLogs\\${city}\\${dateStr}\\${hour}.mp3`,
           size: '58.2 MB',
           type: 'audio/mpeg',
           lastModified: format(date, 'yyyy-MM-dd')
@@ -52,7 +54,7 @@ export const useAudio = () => {
           const hourStr = i.toString().padStart(2, '0');
           return {
             name: `${hourStr}.mp3`,
-            path: `\\\\server\\audioLogs\\${dateStr}\\${hourStr}.mp3`,
+            path: `\\\\server\\audioLogs\\${city}\\${dateStr}\\${hourStr}.mp3`,
             size: `${Math.floor(50 + Math.random() * 10)}.${Math.floor(Math.random() * 10)}MB`,
             type: 'audio/mpeg',
             lastModified: format(date, 'yyyy-MM-dd')
@@ -69,8 +71,9 @@ export const useAudio = () => {
   useEffect(() => {
     const today = new Date();
     const currentHour = today.getHours().toString().padStart(2, '0');
+    const defaultCity = 'paris';
     
-    loadFilesFromUNC(`\\\\server\\audioLogs`, today, currentHour);
+    loadFilesFromUNC(`\\\\server\\audioLogs`, defaultCity, today, currentHour);
   }, [loadFilesFromUNC]);
 
   useEffect(() => {
@@ -232,6 +235,7 @@ export const useAudio = () => {
 
   const loadAudioFile = (file: AudioFile) => {
     setIsLoading(true);
+    setCurrentAudioFile(file);
     
     setTimeout(() => {
       setAudioSrc('https://audio-samples.github.io/samples/mp3/blizzard_biased/blizzard_01.mp3');
@@ -267,6 +271,7 @@ export const useAudio = () => {
     markers,
     audioFiles,
     isLoading,
+    currentAudioFile,
     togglePlay,
     seek,
     changeVolume,

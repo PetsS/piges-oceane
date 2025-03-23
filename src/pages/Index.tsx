@@ -114,8 +114,8 @@ const Index = () => {
     loadAudioFile(file);
   };
 
-  const handleSearch = (path, date, hour) => {
-    loadFilesFromUNC(path, date, hour);
+  const handleSearch = (path, city, date, hour) => {
+    loadFilesFromUNC(path, city, date, hour);
   };
 
   return (
