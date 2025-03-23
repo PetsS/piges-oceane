@@ -68,7 +68,7 @@ export const LocalAudioLoader = ({ onFileLoad }: LocalAudioLoaderProps) => {
 
   return (
     <div className="glass-panel rounded-lg p-4 animate-fade-in">
-      <h3 className="text-lg font-medium mb-4">Test avec des fichiers locaux</h3>
+      <h3 className="text-lg font-medium mb-4">Fichiers locaux</h3>
       
       <div 
         className={`border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-center transition-all ${
