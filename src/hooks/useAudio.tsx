@@ -365,7 +365,10 @@ export const useAudio = () => {
         processChunk(0).catch(reject);
       } catch (error) {
         console.error("Error in MP3 encoding:", error);
-        reject(error);
+        console.log("MP3 encoding failed, falling back to WAV export");
+        bufferToWav(buffer)
+          .then(resolve)
+          .catch(reject);
       }
     });
   }, []);
@@ -431,32 +434,33 @@ export const useAudio = () => {
     processingRef.current = true;
     
     try {
-      if (!audioBuffer || !audioRef.current) {
+      if (!audioBuffer) {
         console.log("No audio buffer available, creating from audio element...");
         
-        if (audioRef.current && audioRef.current.src) {
-          toast.info('Préparation de l\'audio pour l\'export...');
+        if (!audioRef.current || !audioRef.current.src) {
+          toast.error('Aucun audio chargé');
+          processingRef.current = false;
+          return;
+        }
+        
+        toast.info('Préparation de l\'audio pour l\'export...');
+        
+        try {
+          const url = audioRef.current.src;
+          console.log("Fetching audio buffer from URL:", url);
+          const buffer = await fetchAndDecodeAudio(url);
           
-          try {
-            const url = audioRef.current.src;
-            const buffer = await fetchAndDecodeAudio(url);
-            
-            if (!buffer) {
-              toast.error('Impossible de préparer l\'audio pour l\'export');
-              processingRef.current = false;
-              return;
-            }
-            
-            setAudioBuffer(buffer);
-            console.log("Successfully created audio buffer from element, proceeding with export");
-          } catch (error) {
-            console.error("Error creating buffer from audio element:", error);
-            toast.error('Erreur lors de la préparation de l\'audio');
+          if (!buffer) {
+            toast.error('Impossible de préparer l\'audio pour l\'export');
             processingRef.current = false;
             return;
           }
-        } else {
-          toast.error('Aucun audio chargé');
+          
+          setAudioBuffer(buffer);
+          console.log("Successfully created audio buffer from element, proceeding with export");
+        } catch (error) {
+          console.error("Error creating buffer from audio element:", error);
+          toast.error('Erreur lors de la préparation de l\'audio');
           processingRef.current = false;
           return;
         }
@@ -501,6 +505,14 @@ export const useAudio = () => {
         return;
       }
       
+      console.log(`Creating trimmed buffer with parameters:
+        - Channels: ${Math.min(2, audioBuffer.numberOfChannels)}
+        - Frame count: ${frameCount}
+        - Sample rate: ${sampleRate}
+        - Start sample: ${startSample}
+        - End sample: ${endSample}
+      `);
+      
       const trimmedBuffer = audioContext.createBuffer(
         Math.min(2, audioBuffer.numberOfChannels),
         frameCount,
@@ -508,15 +520,20 @@ export const useAudio = () => {
       );
       
       for (let channel = 0; channel < Math.min(2, audioBuffer.numberOfChannels); channel++) {
+        console.log(`Processing channel ${channel}`);
         const channelData = new Float32Array(frameCount);
         audioBuffer.copyFromChannel(channelData, channel, startSample);
         trimmedBuffer.copyToChannel(channelData, channel);
       }
       
+      console.log("Trimmed buffer created successfully, proceeding to MP3 encoding");
+      
       const fileExtension = "mp3";
       const bitrate = 192;
       
+      console.log(`Starting encoding to ${fileExtension} with bitrate ${bitrate}kbps`);
       const trimmedAudioBlob = await bufferToMp3(trimmedBuffer, bitrate);
+      console.log(`Successfully encoded to ${fileExtension}, blob size: ${trimmedAudioBlob.size} bytes`);
       
       const fileName = currentAudioFile ? 
                       currentAudioFile.name.replace(/\.[^/.]+$/, "") : 
@@ -549,7 +566,7 @@ export const useAudio = () => {
     } finally {
       processingRef.current = false;
     }
-  }, [audioBuffer, audioRef, markers, duration, formatTime, getAudioContext, currentAudioFile, fetchAndDecodeAudio, bufferToMp3]);
+  }, [audioBuffer, markers, duration, formatTime, getAudioContext, currentAudioFile, fetchAndDecodeAudio, bufferToMp3]);
 
   const loadAudioFile = useCallback((file: AudioFile) => {
     setIsLoading(true);
