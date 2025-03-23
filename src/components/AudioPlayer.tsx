@@ -23,6 +23,7 @@ interface AudioPlayerProps {
   onSeek: (time: number) => void;
   formatTime: (time: number) => string;
   audioTitle?: string;
+  isLoading?: boolean;
 }
 
 // Use memo to prevent unnecessary re-renders
@@ -36,6 +37,7 @@ export const AudioPlayer = memo(({
   onSeek,
   formatTime,
   audioTitle = "Aucun audio chargé",
+  isLoading = false,
 }: AudioPlayerProps) => {
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
   
@@ -67,7 +69,9 @@ export const AudioPlayer = memo(({
             <Music className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h3 className="font-medium truncate max-w-[200px]">{audioTitle}</h3>
+            <h3 className="font-medium truncate max-w-[200px]">
+              {isLoading ? "Chargement..." : audioTitle}
+            </h3>
             <p className="text-xs text-muted-foreground">
               {formatTime(currentTime)} / {formatTime(duration)}
             </p>
@@ -109,7 +113,7 @@ export const AudioPlayer = memo(({
             max={100}
             step={0.1}
             onValueChange={(value) => onSeek((value[0] / 100) * duration)}
-            disabled={duration === 0}
+            disabled={duration === 0 || isLoading}
             className="cursor-pointer"
           />
           <div className="flex justify-between text-xs text-muted-foreground">
@@ -124,7 +128,7 @@ export const AudioPlayer = memo(({
             size="icon"
             className="rounded-full h-10 w-10"
             onClick={handleSkipBack}
-            disabled={duration === 0}
+            disabled={duration === 0 || isLoading}
           >
             <ChevronsLeft className="h-5 w-5" />
           </Button>
@@ -134,7 +138,7 @@ export const AudioPlayer = memo(({
             size="icon"
             className="rounded-full h-14 w-14 transition-all hover:scale-105 active:scale-95"
             onClick={onPlayPause}
-            disabled={duration === 0}
+            disabled={duration === 0 || isLoading}
           >
             {isPlaying ? (
               <Pause className="h-6 w-6" />
@@ -148,7 +152,7 @@ export const AudioPlayer = memo(({
             size="icon"
             className="rounded-full h-10 w-10"
             onClick={handleSkipForward}
-            disabled={duration === 0}
+            disabled={duration === 0 || isLoading}
           >
             <ChevronsRight className="h-5 w-5" />
           </Button>

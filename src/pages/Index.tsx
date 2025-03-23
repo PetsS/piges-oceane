@@ -64,6 +64,7 @@ const colorToHsl = (color: string) => {
 
 const Index = () => {
   const [showAdmin, setShowAdmin] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const navigate = useNavigate();
   const {
     audioFiles,
@@ -117,6 +118,17 @@ const Index = () => {
 
   const handleSearch = (path, city, date, hour) => {
     loadFilesFromUNC(path, city, date, hour);
+  };
+
+  const handleExport = async () => {
+    try {
+      setIsExporting(true);
+      await exportTrimmedAudio();
+    } catch (error) {
+      console.error("Export error:", error);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -179,6 +191,7 @@ const Index = () => {
               onSeek={seek}
               formatTime={formatTime}
               audioTitle={currentAudioFile ? currentAudioFile.name : "Aucun audio chargé"}
+              isLoading={isLoading}
             />
           </div>
 
@@ -186,9 +199,10 @@ const Index = () => {
             <MarkerControls
               markers={markers}
               onAddMarker={addMarker}
-              onExport={exportTrimmedAudio}
+              onExport={handleExport}
               currentTime={currentTime}
               formatTimeDetailed={formatTimeDetailed}
+              isExporting={isExporting}
             />
           </div>
         </div>

@@ -8,7 +8,8 @@ import {
 } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { AudioMarker } from "@/hooks/useAudio";
-import { ArrowLeftToLine, ArrowRightToLine, Scissors } from "lucide-react";
+import { ArrowLeftToLine, ArrowRightToLine } from "lucide-react";
+import { AudioExporter } from "./AudioExporter";
 
 interface MarkerControlsProps {
   markers: AudioMarker[];
@@ -16,6 +17,7 @@ interface MarkerControlsProps {
   onExport: () => void;
   currentTime: number;
   formatTimeDetailed: (time: number) => string;
+  isExporting?: boolean;
 }
 
 export const MarkerControls = ({
@@ -24,6 +26,7 @@ export const MarkerControls = ({
   onExport,
   currentTime,
   formatTimeDetailed,
+  isExporting = false,
 }: MarkerControlsProps) => {
   const startMarker = markers.find((marker) => marker.type === "start");
   const endMarker = markers.find((marker) => marker.type === "end");
@@ -124,28 +127,14 @@ export const MarkerControls = ({
           </div>
         )}
 
-        {startMarker && endMarker && (
-          <div className="flex justify-between items-center p-3 rounded-md bg-blue-50 border border-blue-100 animate-scale-in">
-            <div>
-              <div className="text-sm font-medium">Durée</div>
-              <div className="text-xs text-muted-foreground font-mono">
-                {formatTimeDetailed(
-                  endMarker.position - startMarker.position
-                )}
-              </div>
-            </div>
-          </div>
-        )}
+        <AudioExporter 
+          markers={markers}
+          onExport={onExport}
+          isExporting={isExporting}
+          formatTimeDetailed={formatTimeDetailed}
+          canExport={canExport}
+        />
       </div>
-
-      <Button
-        disabled={!canExport}
-        onClick={onExport}
-        className="w-full mt-auto transition-all duration-300 hover:shadow-md hover:translate-y-[-1px]"
-      >
-        <Scissors className="h-4 w-4 mr-2" />
-        Exporter l'audio
-      </Button>
     </div>
   );
 };
