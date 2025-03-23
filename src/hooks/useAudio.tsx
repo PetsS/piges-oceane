@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -35,7 +34,6 @@ export const useAudio = () => {
   const animationRef = useRef<number | null>(null);
   const processingRef = useRef<boolean>(false);
 
-  // Clean up audio context when component unmounts
   useEffect(() => {
     return () => {
       if (audioContextRef.current) {
@@ -110,9 +108,9 @@ export const useAudio = () => {
     return audioContextRef.current;
   }, []);
 
-  // More efficient audio decoding with proper error handling
   const fetchAndDecodeAudio = useCallback(async (url: string): Promise<AudioBuffer | null> => {
     try {
+      console.log("Fetching audio from URL:", url);
       const response = await fetch(url);
       if (!response.ok) {
         throw new Error(`Failed to fetch audio: ${response.status} ${response.statusText}`);
@@ -121,11 +119,11 @@ export const useAudio = () => {
       const arrayBuffer = await response.arrayBuffer();
       const audioContext = getAudioContext();
       
-      // Handle very large files more efficiently
-      if (arrayBuffer.byteLength > 50 * 1024 * 1024) { // 50MB
+      if (arrayBuffer.byteLength > 50 * 1024 * 1024) {
         toast.info('Large audio file detected. Processing may take longer.');
       }
       
+      console.log("Successfully fetched audio, decoding...");
       return await audioContext.decodeAudioData(arrayBuffer);
     } catch (error) {
       console.error('Error decoding audio data:', error);
@@ -136,13 +134,11 @@ export const useAudio = () => {
   useEffect(() => {
     if (!audioSrc) return;
     
-    // Clean up any previous audio elements
     if (audioRef.current && audioRef.current.src !== audioSrc) {
       audioRef.current.pause();
       audioRef.current.src = '';
     }
     
-    // Create a new audio element or reset the existing one
     if (!audioRef.current) {
       audioRef.current = new Audio();
     }
@@ -186,9 +182,7 @@ export const useAudio = () => {
     audio.addEventListener('ended', onEnded);
     audio.addEventListener('error', onError);
     
-    // Only load the buffer when needed for export
     const loadBuffer = async () => {
-      // Clear previous buffer to free memory
       setAudioBuffer(null);
       
       if (!audioSrc) return;
@@ -208,7 +202,6 @@ export const useAudio = () => {
       }
     };
     
-    // Only load full buffer when needed (delayed)
     const bufferTimeout = setTimeout(loadBuffer, 1000);
     
     return () => {
@@ -296,10 +289,90 @@ export const useAudio = () => {
     setMarkers(markers.filter(marker => marker.id !== id));
   }, [markers]);
 
-  // The bufferToWav function (more memory efficient)
+  const bufferToMp3 = useCallback((buffer: AudioBuffer, bitrate = 192): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      try {
+        console.log("Starting MP3 encoding process...");
+        const sampleRate = buffer.sampleRate;
+        const numChannels = Math.min(buffer.numberOfChannels, 2);
+        
+        const mp3encoder = new lamejs.Mp3Encoder(
+          numChannels,
+          sampleRate,
+          bitrate
+        );
+        
+        const mp3Data: Int8Array[] = [];
+        
+        const channelData: Float32Array[] = [];
+        for (let i = 0; i < numChannels; i++) {
+          channelData.push(buffer.getChannelData(i));
+        }
+        
+        const sampleBlockSize = 1152;
+        const totalSamples = buffer.length;
+        
+        const processChunkSize = 50000;
+        
+        const processChunk = async (startIndex: number) => {
+          const endIndex = Math.min(startIndex + processChunkSize, totalSamples);
+          
+          for (let i = startIndex; i < endIndex; i += sampleBlockSize) {
+            const leftChunk = new Int16Array(sampleBlockSize);
+            const rightChunk = numChannels > 1 ? new Int16Array(sampleBlockSize) : undefined;
+            
+            for (let j = 0; j < sampleBlockSize; j++) {
+              if (i + j < totalSamples) {
+                leftChunk[j] = Math.max(-32768, Math.min(32767, channelData[0][i + j] * 32767));
+                if (rightChunk && numChannels > 1) {
+                  rightChunk[j] = Math.max(-32768, Math.min(32767, channelData[1][i + j] * 32767));
+                }
+              } else {
+                leftChunk[j] = 0;
+                if (rightChunk) {
+                  rightChunk[j] = 0;
+                }
+              }
+            }
+            
+            let mp3buf;
+            if (numChannels === 1) {
+              mp3buf = mp3encoder.encodeBuffer(leftChunk);
+            } else {
+              mp3buf = mp3encoder.encodeBuffer(leftChunk, rightChunk);
+            }
+            
+            if (mp3buf && mp3buf.length > 0) {
+              mp3Data.push(mp3buf);
+            }
+          }
+          
+          if (endIndex < totalSamples) {
+            await new Promise(r => setTimeout(r, 0));
+            return processChunk(endIndex);
+          }
+          
+          const finalMp3buf = mp3encoder.flush();
+          if (finalMp3buf && finalMp3buf.length > 0) {
+            mp3Data.push(finalMp3buf);
+          }
+          
+          const blob = new Blob(mp3Data, { type: 'audio/mp3' });
+          console.log("MP3 encoding completed successfully!");
+          resolve(blob);
+        };
+        
+        processChunk(0).catch(reject);
+      } catch (error) {
+        console.error("Error in MP3 encoding:", error);
+        reject(error);
+      }
+    });
+  }, []);
+
   const bufferToWav = useCallback((buffer: AudioBuffer): Promise<Blob> => {
     return new Promise((resolve) => {
-      const numOfChannels = Math.min(buffer.numberOfChannels, 2); // Limit to stereo to save memory
+      const numOfChannels = Math.min(buffer.numberOfChannels, 2);
       const length = buffer.length * numOfChannels * 2;
       const sampleRate = buffer.sampleRate;
       
@@ -329,13 +402,11 @@ export const useAudio = () => {
       const offset = 44;
       let pos = offset;
       
-      // Process in smaller chunks to reduce memory pressure
-      const chunkSize = 10000; // Number of samples to process at once
+      const chunkSize = 10000;
       
       for (let i = 0; i < buffer.length; i += chunkSize) {
         const blockSize = Math.min(chunkSize, buffer.length - i);
         
-        // For each chunk, process all channels
         for (let j = 0; j < blockSize; j++) {
           for (let channel = 0; channel < numOfChannels; channel++) {
             const sample = buffer.getChannelData(channel)[i + j];
@@ -351,148 +422,72 @@ export const useAudio = () => {
     });
   }, []);
 
-  // Memory-optimized MP3 encoding function
-  const bufferToMp3 = useCallback((buffer: AudioBuffer, bitrate = 192): Promise<Blob> => {
-    return new Promise((resolve, reject) => {
-      try {
-        const sampleRate = buffer.sampleRate;
-        const numChannels = Math.min(buffer.numberOfChannels, 2); // Limit to stereo
-        
-        // Initialize LAME encoder with proper settings
-        const mp3encoder = new lamejs.Mp3Encoder(
-          numChannels,  // number of channels (1 for mono, 2 for stereo)
-          sampleRate,   // sample rate (e.g., 44100)
-          bitrate       // bitrate (e.g., 128, 192, 256, 320)
-        );
-        
-        const mp3Data: Int8Array[] = [];
-        
-        // Get channel data
-        const channelData: Float32Array[] = [];
-        for (let i = 0; i < numChannels; i++) {
-          channelData.push(buffer.getChannelData(i));
-        }
-        
-        const sampleBlockSize = 1152; // LAME recommends 1152 samples per frame
-        const totalSamples = buffer.length;
-        
-        // Process in larger chunks to improve performance
-        const processChunkSize = 50000; // ~1 second of audio at 44.1kHz
-        
-        const processChunk = async (startIndex: number) => {
-          const endIndex = Math.min(startIndex + processChunkSize, totalSamples);
-          
-          for (let i = startIndex; i < endIndex; i += sampleBlockSize) {
-            const leftChunk = new Int16Array(sampleBlockSize);
-            const rightChunk = numChannels > 1 ? new Int16Array(sampleBlockSize) : undefined;
-            
-            // Fill with audio data or silence if past the end of file
-            for (let j = 0; j < sampleBlockSize; j++) {
-              if (i + j < totalSamples) {
-                // Scale Float32 [-1,1] to Int16 [-32768,32767]
-                leftChunk[j] = Math.max(-32768, Math.min(32767, channelData[0][i + j] * 32767));
-                if (rightChunk && numChannels > 1) {
-                  rightChunk[j] = Math.max(-32768, Math.min(32767, channelData[1][i + j] * 32767));
-                }
-              } else {
-                leftChunk[j] = 0;
-                if (rightChunk) {
-                  rightChunk[j] = 0;
-                }
-              }
-            }
-            
-            let mp3buf;
-            if (numChannels === 1) {
-              mp3buf = mp3encoder.encodeBuffer(leftChunk);
-            } else {
-              mp3buf = mp3encoder.encodeBuffer(leftChunk, rightChunk);
-            }
-            
-            if (mp3buf && mp3buf.length > 0) {
-              mp3Data.push(mp3buf);
-            }
-          }
-          
-          // Allow the browser to perform garbage collection
-          if (endIndex < totalSamples) {
-            await new Promise(r => setTimeout(r, 0));
-            return processChunk(endIndex);
-          }
-          
-          // Finalize the MP3
-          const finalMp3buf = mp3encoder.flush();
-          if (finalMp3buf && finalMp3buf.length > 0) {
-            mp3Data.push(finalMp3buf);
-          }
-          
-          // Create the blob
-          const blob = new Blob(mp3Data, { type: 'audio/mp3' });
-          resolve(blob);
-        };
-        
-        // Start processing
-        processChunk(0).catch(reject);
-        
-      } catch (error) {
-        console.error("Error in MP3 encoding:", error);
-        reject(error);
-      }
-    });
-  }, []);
-
-  // Memory-efficient export function
   const exportTrimmedAudio = useCallback(async () => {
-    // Prevent multiple export operations
     if (processingRef.current) {
       toast.info('Traitement en cours, veuillez patienter...');
       return;
     }
     
-    if (!audioBuffer || !currentAudioFile) {
-      // Only now load the buffer if needed for export
-      if (audioSrc && !audioBuffer) {
-        toast.info('Chargement du fichier audio pour export...');
-        try {
-          const buffer = await fetchAndDecodeAudio(audioSrc);
-          if (buffer) {
-            setAudioBuffer(buffer);
-            // Continue with export after buffer is loaded
-            setTimeout(() => exportTrimmedAudio(), 500);
-          } else {
-            toast.error('Impossible de charger l\'audio pour l\'export');
-          }
-        } catch (error) {
-          console.error('Error loading buffer for export:', error);
-          toast.error('Erreur lors du chargement pour l\'export');
-        }
-        return;
-      }
-      
-      toast.error('Aucun audio chargé ou fichier non compatible avec l\'export');
-      return;
-    }
-    
-    const startMarker = markers.find(marker => marker.type === 'start');
-    const endMarker = markers.find(marker => marker.type === 'end');
-    
-    if (!startMarker && !endMarker) {
-      toast.error('Vous devez définir au moins un marqueur');
-      return;
-    }
-    
-    const startTime = startMarker ? startMarker.position : 0;
-    const endTime = endMarker ? endMarker.position : duration;
-    
-    if (startTime >= endTime) {
-      toast.error('Le marqueur de début doit être avant celui de fin');
-      return;
-    }
-    
-    toast.success('Traitement du segment audio...', { duration: 2000 });
     processingRef.current = true;
     
     try {
+      if (!audioBuffer || !audioRef.current) {
+        console.log("No audio buffer available, creating from audio element...");
+        
+        if (audioRef.current && audioRef.current.src) {
+          toast.info('Préparation de l\'audio pour l\'export...');
+          
+          try {
+            const url = audioRef.current.src;
+            const buffer = await fetchAndDecodeAudio(url);
+            
+            if (!buffer) {
+              toast.error('Impossible de préparer l\'audio pour l\'export');
+              processingRef.current = false;
+              return;
+            }
+            
+            setAudioBuffer(buffer);
+            console.log("Successfully created audio buffer from element, proceeding with export");
+          } catch (error) {
+            console.error("Error creating buffer from audio element:", error);
+            toast.error('Erreur lors de la préparation de l\'audio');
+            processingRef.current = false;
+            return;
+          }
+        } else {
+          toast.error('Aucun audio chargé');
+          processingRef.current = false;
+          return;
+        }
+      }
+      
+      if (!audioBuffer) {
+        toast.error('Impossible de préparer l\'audio pour l\'export');
+        processingRef.current = false;
+        return;
+      }
+      
+      const startMarker = markers.find(marker => marker.type === 'start');
+      const endMarker = markers.find(marker => marker.type === 'end');
+      
+      if (!startMarker && !endMarker) {
+        toast.error('Vous devez définir au moins un marqueur');
+        processingRef.current = false;
+        return;
+      }
+      
+      const startTime = startMarker ? startMarker.position : 0;
+      const endTime = endMarker ? endMarker.position : duration;
+      
+      if (startTime >= endTime) {
+        toast.error('Le marqueur de début doit être avant celui de fin');
+        processingRef.current = false;
+        return;
+      }
+      
+      toast.success('Traitement du segment audio...', { duration: 2000 });
+      
       const audioContext = getAudioContext();
       
       const sampleRate = audioBuffer.sampleRate;
@@ -506,73 +501,32 @@ export const useAudio = () => {
         return;
       }
       
-      // More efficient memory usage by processing in smaller chunks for large files
-      const isLargeFile = frameCount > 5000000; // ~2 minutes of stereo audio at 44.1kHz
+      const trimmedBuffer = audioContext.createBuffer(
+        Math.min(2, audioBuffer.numberOfChannels),
+        frameCount,
+        sampleRate
+      );
       
-      let trimmedBuffer;
-      if (isLargeFile) {
-        // For large files, use a more memory-efficient approach
-        toast.info('Fichier volumineux détecté. Traitement optimisé en cours...');
-        
-        // Create buffer with reduced channel count if possible
-        const effectiveChannels = Math.min(2, audioBuffer.numberOfChannels);
-        trimmedBuffer = audioContext.createBuffer(
-          effectiveChannels,
-          frameCount,
-          sampleRate
-        );
-        
-        // Process one channel at a time to reduce peak memory usage
-        for (let channel = 0; channel < effectiveChannels; channel++) {
-          const newChannelData = new Float32Array(frameCount);
-          // Copy in smaller chunks to reduce memory spikes
-          const chunkSize = 100000;
-          for (let i = 0; i < frameCount; i += chunkSize) {
-            const blockSize = Math.min(chunkSize, frameCount - i);
-            const tempChunk = new Float32Array(blockSize);
-            audioBuffer.copyFromChannel(tempChunk, channel, startSample + i);
-            newChannelData.set(tempChunk, i);
-            // Allow browser to garbage collect
-            await new Promise(r => setTimeout(r, 0));
-          }
-          trimmedBuffer.copyToChannel(newChannelData, channel);
-        }
-      } else {
-        // Standard approach for smaller files
-        trimmedBuffer = audioContext.createBuffer(
-          audioBuffer.numberOfChannels,
-          frameCount,
-          sampleRate
-        );
-        
-        for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
-          const channelData = new Float32Array(frameCount);
-          audioBuffer.copyFromChannel(channelData, channel, startSample);
-          trimmedBuffer.copyToChannel(channelData, channel);
-        }
+      for (let channel = 0; channel < Math.min(2, audioBuffer.numberOfChannels); channel++) {
+        const channelData = new Float32Array(frameCount);
+        audioBuffer.copyFromChannel(channelData, channel, startSample);
+        trimmedBuffer.copyToChannel(channelData, channel);
       }
       
-      let trimmedAudioBlob: Blob;
-      let fileExtension: string = "mp3";
+      const fileExtension = "mp3";
       const bitrate = 192;
       
-      // Use MP3 192k export with fallback to WAV
-      try {
-        trimmedAudioBlob = await bufferToMp3(trimmedBuffer, bitrate);
-      } catch (error) {
-        console.error("Error in MP3 encoding:", error);
-        toast.error("Erreur lors de l'encodage MP3. Export en WAV à la place.");
-        trimmedAudioBlob = await bufferToWav(trimmedBuffer);
-        fileExtension = "wav";
-      }
+      const trimmedAudioBlob = await bufferToMp3(trimmedBuffer, bitrate);
       
-      const originalName = currentAudioFile.name.replace(/\.[^/.]+$/, "");
-      const exportFileName = `${originalName}_${formatTime(startTime).replace(':', '')}-${formatTime(endTime).replace(':', '')}.${fileExtension}`;
+      const fileName = currentAudioFile ? 
+                      currentAudioFile.name.replace(/\.[^/.]+$/, "") : 
+                      "audio";
+      const exportFileName = `${fileName}_${formatTime(startTime).replace(':', '')}-${formatTime(endTime).replace(':', '')}.${fileExtension}`;
       
       const downloadUrl = URL.createObjectURL(trimmedAudioBlob);
       
       toast.success(`Export prêt: ${exportFileName}`, {
-        description: `Découpé de ${formatTime(startTime)} à ${formatTime(endTime)} (${fileExtension === "mp3" ? `MP3 ${bitrate}kbps` : "WAV"})`,
+        description: `Découpé de ${formatTime(startTime)} à ${formatTime(endTime)} (MP3 ${bitrate}kbps)`,
         action: {
           label: 'Télécharger',
           onClick: () => {
@@ -582,25 +536,25 @@ export const useAudio = () => {
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
-            // Release object URL immediately after download starts
             setTimeout(() => URL.revokeObjectURL(downloadUrl), 100);
           }
         },
         duration: 5000
       });
+      
+      console.log(`Export completed successfully: ${exportFileName}`);
     } catch (error) {
       console.error('Error exporting audio:', error);
       toast.error('Erreur lors de l\'export du fichier audio');
     } finally {
       processingRef.current = false;
     }
-  }, [audioBuffer, audioSrc, currentAudioFile, duration, markers, formatTime, getAudioContext, fetchAndDecodeAudio, bufferToMp3, bufferToWav]);
+  }, [audioBuffer, audioRef, markers, duration, formatTime, getAudioContext, currentAudioFile, fetchAndDecodeAudio, bufferToMp3]);
 
   const loadAudioFile = useCallback((file: AudioFile) => {
     setIsLoading(true);
     setCurrentAudioFile(file);
     
-    // Clean up previous resources
     if (audioRef.current) {
       audioRef.current.pause();
       if (audioSrc) {
@@ -608,7 +562,6 @@ export const useAudio = () => {
       }
     }
     
-    // Clear audio buffer to free memory
     setAudioBuffer(null);
     
     if (file.path.startsWith('blob:') || file.path.startsWith('http')) {
@@ -618,7 +571,6 @@ export const useAudio = () => {
       setIsLoading(false);
     } else {
       setTimeout(() => {
-        // Use a more reliable audio sample
         setAudioSrc('https://assets.mixkit.co/music/preview/mixkit-tech-house-vibes-130.mp3');
         setIsPlaying(false);
         setCurrentTime(0);
@@ -629,7 +581,6 @@ export const useAudio = () => {
     }
   }, [audioSrc]);
 
-  // Clean up resources when component unmounts
   useEffect(() => {
     return () => {
       if (animationRef.current) {
@@ -645,7 +596,6 @@ export const useAudio = () => {
         audioContextRef.current.close().catch(console.error);
       }
       
-      // Release any object URLs
       if (audioSrc && audioSrc.startsWith('blob:')) {
         URL.revokeObjectURL(audioSrc);
       }
@@ -674,4 +624,3 @@ export const useAudio = () => {
     formatTimeDetailed
   };
 };
-
