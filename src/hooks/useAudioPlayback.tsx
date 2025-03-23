@@ -1,6 +1,10 @@
+
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { useAudioContext } from './useAudioContext';
+import { useAudioBufferDecoder } from './useAudioBufferDecoder';
+import { useAudioEventHandlers } from './useAudioEventHandlers';
+import { useAudioCleanup } from './useAudioCleanup';
 import { useAudioMarkers } from './useAudioMarkers';
 import { useAudioFormatting } from './useAudioFormatting';
 
@@ -20,24 +24,10 @@ export const useAudioPlayback = () => {
   const { audioContextRef, getAudioContext } = useAudioContext();
   const { formatTime, formatTimeDetailed } = useAudioFormatting();
   const { markers, addMarker, removeMarker, initializeMarkers, setMarkers } = useAudioMarkers(formatTime);
-
+  const { fetchAndDecodeAudio } = useAudioBufferDecoder(getAudioContext);
+  
   // Clean up animation frame and audio element
-  const cleanup = useCallback(() => {
-    if (animationRef.current) {
-      cancelAnimationFrame(animationRef.current);
-      animationRef.current = null;
-    }
-    
-    if (sourceNodeRef.current) {
-      try {
-        sourceNodeRef.current.stop();
-        sourceNodeRef.current.disconnect();
-        sourceNodeRef.current = null;
-      } catch (error) {
-        console.error("Error stopping source node:", error);
-      }
-    }
-  }, []);
+  const { cleanup } = useAudioCleanup(animationRef, sourceNodeRef);
   
   const animateTime = useCallback(() => {
     if (audioRef.current) {
@@ -45,6 +35,20 @@ export const useAudioPlayback = () => {
       animationRef.current = requestAnimationFrame(animateTime);
     }
   }, []);
+
+  // Import event handlers for audio elements
+  const { setupAudioEvents } = useAudioEventHandlers({
+    audioRef,
+    setDuration,
+    setCurrentTime,
+    setIsPlaying,
+    setIsBuffering,
+    cleanup,
+    animationRef,
+    initializeMarkers,
+    fetchAndDecodeAudio,
+    setAudioBuffer
+  });
 
   const togglePlay = useCallback(() => {
     if (!audioRef.current) return;
@@ -124,131 +128,6 @@ export const useAudioPlayback = () => {
     setVolume(newVolume);
   }, []);
 
-  const fetchAndDecodeAudio = useCallback(async (url: string): Promise<AudioBuffer | null> => {
-    try {
-      console.log("Fetching audio from URL:", url);
-      
-      // For local files (blob URLs)
-      if (url.startsWith('blob:')) {
-        console.log("Processing local blob URL:", url);
-        
-        // For large files, we only need a small portion for waveform visualization
-        // Fetch only the first 5MB of data for efficiency
-        const response = await fetch(url, {
-          headers: {
-            Range: 'bytes=0-5242880' // First 5MB only
-          }
-        }).catch(() => {
-          // If Range header is not supported, fall back to regular fetch
-          console.log("Range header not supported, fetching full file");
-          return fetch(url);
-        });
-        
-        // Read only part of the file if it's very large
-        let arrayBuffer;
-        
-        // Only read a portion of large files to avoid memory issues
-        if (response.headers.get('Content-Length') && 
-            parseInt(response.headers.get('Content-Length')!) > 20 * 1024 * 1024) {
-          console.log("Large file detected, processing partial data");
-          const reader = response.body?.getReader();
-          
-          if (reader) {
-            // Read only first 5MB for processing
-            const maxBytes = 5 * 1024 * 1024;
-            let bytesRead = 0;
-            const chunks = [];
-            
-            while (bytesRead < maxBytes) {
-              const {done, value} = await reader.read();
-              if (done) break;
-              
-              chunks.push(value);
-              bytesRead += value.length;
-            }
-            
-            // Combine chunks into a single ArrayBuffer
-            const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
-            const combinedArray = new Uint8Array(totalLength);
-            
-            let position = 0;
-            for (const chunk of chunks) {
-              combinedArray.set(chunk, position);
-              position += chunk.length;
-            }
-            
-            arrayBuffer = combinedArray.buffer;
-          } else {
-            arrayBuffer = await response.arrayBuffer();
-          }
-        } else {
-          arrayBuffer = await response.arrayBuffer();
-        }
-        
-        const audioContext = getAudioContext();
-        
-        if (!audioContext) {
-          throw new Error("Failed to create AudioContext");
-        }
-        
-        // For very large files (> 100MB), create a minimal buffer instead of decoding
-        if (arrayBuffer.byteLength > 100 * 1024 * 1024) {
-          console.log("File too large for full decoding, creating sample buffer");
-          
-          // Create a small buffer just for visualization (10 seconds)
-          const sampleRate = audioContext.sampleRate;
-          const buffer = audioContext.createBuffer(2, 10 * sampleRate, sampleRate);
-          
-          for (let channel = 0; channel < 2; channel++) {
-            const data = buffer.getChannelData(channel);
-            for (let i = 0; i < data.length; i++) {
-              data[i] = Math.sin(i * 0.01) * 0.5;
-            }
-          }
-          
-          return buffer;
-        }
-        
-        // Try to decode the audio data
-        try {
-          return await audioContext.decodeAudioData(arrayBuffer);
-        } catch (decodeError) {
-          console.error("Error decoding audio data:", decodeError);
-          
-          // Create a fallback buffer
-          const buffer = audioContext.createBuffer(2, 10 * audioContext.sampleRate, audioContext.sampleRate);
-          for (let channel = 0; channel < 2; channel++) {
-            const data = buffer.getChannelData(channel);
-            for (let i = 0; i < data.length; i++) {
-              data[i] = Math.sin(i * 0.01) * 0.5;
-            }
-          }
-          return buffer;
-        }
-      }
-      
-      // ... keep existing code (for handling sample URLs and network audio)
-      
-      // Create default fallback buffer
-      const audioContext = getAudioContext();
-      const buffer = audioContext?.createBuffer(2, 44100 * 3, 44100);
-      
-      if (buffer) {
-        for (let channel = 0; channel < 2; channel++) {
-          const data = buffer.getChannelData(channel);
-          for (let i = 0; i < 44100 * 3; i++) {
-            data[i] = Math.sin(i * 0.01) * 0.5;
-          }
-        }
-      }
-      
-      return buffer;
-    } catch (error) {
-      console.error('Error decoding audio data:', error);
-      return null;
-    }
-  }, [getAudioContext]);
-
   // Set up audio element and load audio data when audioSrc changes
   useEffect(() => {
     if (!audioSrc) return;
@@ -278,114 +157,21 @@ export const useAudioPlayback = () => {
     audioRef.current.volume = volume;
     audioRef.current.crossOrigin = "anonymous"; // Add this to handle CORS
     
-    // For large files, reduce buffering amount to save memory
-    if (typeof audioRef.current.preload !== 'undefined') {
-      audioRef.current.preload = "metadata";
-    }
+    // Set up audio event handlers
+    const cleanupEvents = setupAudioEvents(audioSrc);
     
-    const audio = audioRef.current;
-    
-    const setAudioData = () => {
-      console.log("Audio loaded successfully, duration:", audio.duration);
-      setDuration(audio.duration);
-      initializeMarkers(audio.duration);
-      setIsBuffering(false);
-    };
-    
-    const setAudioTime = () => {
-      setCurrentTime(audio.currentTime);
-    };
-    
-    const onEnded = () => {
-      setIsPlaying(false);
-      setCurrentTime(0);
-      cleanup();
-    };
-    
-    const onError = (e: any) => {
-      console.error('Error loading audio:', e);
-      setIsBuffering(false);
-      
-      // ... keep existing code (for fallback tone generation)
-      
-      toast.error('Impossible de charger le fichier audio. Un fichier test sera utilisé à la place.');
-      
-      // Set to 1 hour (3600 seconds) for duration to match expected file size
-      setDuration(3600);
-      initializeMarkers(3600);
-    };
-    
-    // Add buffering event listeners for large files
-    const onWaiting = () => {
-      setIsBuffering(true);
-    };
-    
-    const onCanPlay = () => {
-      setIsBuffering(false);
-    };
-    
-    audio.addEventListener('loadeddata', setAudioData);
-    audio.addEventListener('loadedmetadata', setAudioData); // Also listen for metadata loaded
-    audio.addEventListener('timeupdate', setAudioTime);
-    audio.addEventListener('ended', onEnded);
-    audio.addEventListener('error', onError);
-    audio.addEventListener('waiting', onWaiting);
-    audio.addEventListener('canplay', onCanPlay);
-    
-    // Show buffering state while loading
-    setIsBuffering(true);
-    
-    const loadBuffer = async () => {
-      setAudioBuffer(null);
-      
-      if (!audioSrc) return;
-      
-      try {
-        // For blob URLs, try to fetch and decode the audio data
-        if (audioSrc.startsWith('blob:')) {
-          console.log("Loading buffer for blob URL");
-          const buffer = await fetchAndDecodeAudio(audioSrc);
-          if (buffer) {
-            console.log("Successfully decoded blob audio buffer");
-            setAudioBuffer(buffer);
-          }
-        } else {
-          // For other sources, use the existing logic
-          const buffer = await fetchAndDecodeAudio(audioSrc);
-          if (buffer) {
-            setAudioBuffer(buffer);
-            console.log("Audio buffer loaded successfully");
-          }
-        }
-      } catch (error) {
-        console.error('Error loading audio buffer:', error);
-      } finally {
-        setIsBuffering(false);
-      }
-    };
-    
-    // Delay buffer loading to prioritize metadata and UI responsiveness
-    const bufferTimeout = setTimeout(loadBuffer, 2000);
-    
+    // Clean up resources when component unmounts or audioSrc changes
     return () => {
-      audio.removeEventListener('loadeddata', setAudioData);
-      audio.removeEventListener('loadedmetadata', setAudioData);
-      audio.removeEventListener('timeupdate', setAudioTime);
-      audio.removeEventListener('ended', onEnded);
-      audio.removeEventListener('error', onError);
-      audio.removeEventListener('waiting', onWaiting);
-      audio.removeEventListener('canplay', onCanPlay);
-      clearTimeout(bufferTimeout);
+      cleanupEvents();
       
-      // Cleanup resources for this effect
-      if (audio.src) {
-        audio.pause();
-        audio.src = '';
+      if (audioRef.current?.src) {
+        audioRef.current.pause();
+        audioRef.current.src = '';
       }
       
       setIsBuffering(false);
     };
-  }, [audioSrc, volume, fetchAndDecodeAudio, getAudioContext, initializeMarkers, cleanup, isPlaying]);
+  }, [audioSrc, volume, cleanup, isPlaying, setupAudioEvents]);
 
   // Clean up resources when component unmounts
   useEffect(() => {
