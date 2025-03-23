@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -20,6 +19,8 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface User {
   username: string;
@@ -71,6 +72,8 @@ const Admin = () => {
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [editingUser, setEditingUser] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string>("user");
 
   const migrateOldCityFormat = (cities: any[]): CityFolder[] => {
     if (cities.length > 0 && typeof cities[0] === 'string') {
@@ -150,6 +153,7 @@ const Admin = () => {
     localStorage.setItem("users", JSON.stringify(updatedUsers));
     
     setNewUser({ username: "", password: "", isAdmin: false });
+    setUserRole("user");
     toast.success("Utilisateur ajouté avec succès");
   };
 
@@ -295,6 +299,27 @@ const Admin = () => {
     toast.success("Ville modifiée avec succès");
   };
 
+  const handleChangeRole = () => {
+    if (!editingUser) return;
+    
+    const updatedUsers = users.map(user => {
+      if (user.username === editingUser) {
+        return {
+          ...user,
+          isAdmin: userRole === "admin"
+        };
+      }
+      return user;
+    });
+    
+    setUsers(updatedUsers);
+    localStorage.setItem("users", JSON.stringify(updatedUsers));
+    
+    setEditingUser(null);
+    
+    toast.success(`Rôle modifié pour ${editingUser}`);
+  };
+
   const colorToHsl = (color: string) => {
     if (color.startsWith('hsl')) {
       const match = color.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
@@ -379,7 +404,7 @@ const Admin = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                   <div className="space-y-2">
                     <Label htmlFor="username">Nom d'utilisateur</Label>
                     <Input 
@@ -398,6 +423,21 @@ const Admin = () => {
                       onChange={(e) => setNewUser({...newUser, password: e.target.value})}
                       placeholder="Mot de passe"
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="role">Rôle</Label>
+                    <Select 
+                      onValueChange={(value) => setNewUser({...newUser, isAdmin: value === "admin"})}
+                      defaultValue="user"
+                    >
+                      <SelectTrigger id="role">
+                        <SelectValue placeholder="Sélectionner un rôle" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="user">Utilisateur</SelectItem>
+                        <SelectItem value="admin">Administrateur</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="pt-8">
                     <Button onClick={handleAddUser}>Ajouter un utilisateur</Button>
@@ -467,6 +507,53 @@ const Admin = () => {
                                 </DialogClose>
                                 <DialogClose asChild>
                                   <Button onClick={handleChangePassword}>Enregistrer</Button>
+                                </DialogClose>
+                              </DialogFooter>
+                            </DialogContent>
+                          </Dialog>
+
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => {
+                                  setEditingUser(user.username);
+                                  setUserRole(user.isAdmin ? "admin" : "user");
+                                }}
+                              >
+                                Modifier rôle
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-[425px]">
+                              <DialogHeader>
+                                <DialogTitle>Modifier le rôle</DialogTitle>
+                                <DialogDescription>
+                                  Changer le rôle de l'utilisateur {editingUser}
+                                </DialogDescription>
+                              </DialogHeader>
+                              <div className="py-4">
+                                <RadioGroup 
+                                  value={userRole}
+                                  onValueChange={setUserRole}
+                                  className="space-y-3"
+                                >
+                                  <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="user" id="user-role" />
+                                    <Label htmlFor="user-role">Utilisateur standard</Label>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="admin" id="admin-role" />
+                                    <Label htmlFor="admin-role">Administrateur</Label>
+                                  </div>
+                                </RadioGroup>
+                              </div>
+                              <DialogFooter>
+                                <DialogClose asChild>
+                                  <Button variant="outline">Annuler</Button>
+                                </DialogClose>
+                                <DialogClose asChild>
+                                  <Button onClick={handleChangeRole}>Enregistrer</Button>
                                 </DialogClose>
                               </DialogFooter>
                             </DialogContent>
