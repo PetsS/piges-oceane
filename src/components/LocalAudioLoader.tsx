@@ -30,6 +30,7 @@ export const LocalAudioLoader = ({ onFileLoad }: LocalAudioLoaderProps) => {
     
     // Create a blob URL for the file
     const blobUrl = URL.createObjectURL(file);
+    console.log(`Created blob URL for ${file.name}: ${blobUrl}`);
     
     const audioFile: AudioFile = {
       name: file.name,
@@ -39,8 +40,25 @@ export const LocalAudioLoader = ({ onFileLoad }: LocalAudioLoaderProps) => {
       lastModified: format(new Date(file.lastModified), 'yyyy-MM-dd')
     };
     
-    onFileLoad(audioFile);
-    toast.success(`Loaded: ${file.name}`);
+    // Create a test Audio element to verify the blob URL works
+    const testAudio = new Audio();
+    testAudio.src = blobUrl;
+    testAudio.preload = "metadata";
+    
+    testAudio.addEventListener('loadedmetadata', () => {
+      console.log(`Successfully verified blob URL for ${file.name}, duration: ${testAudio.duration}s`);
+      toast.success(`Loaded: ${file.name} (${size} MB)`);
+      onFileLoad(audioFile);
+    }, { once: true });
+    
+    testAudio.addEventListener('error', (e) => {
+      console.error(`Error verifying blob URL for ${file.name}:`, e);
+      URL.revokeObjectURL(blobUrl);
+      toast.error(`Failed to load audio file: ${file.name}`);
+    }, { once: true });
+    
+    // Force load metadata
+    testAudio.load();
   };
   
   const handleDragOver = (e: React.DragEvent) => {

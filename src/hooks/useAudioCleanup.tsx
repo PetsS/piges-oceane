@@ -18,11 +18,15 @@ export const useAudioCleanup = (
     
     if (sourceNodeRef.current) {
       try {
+        // Only stop if not already stopped
         sourceNodeRef.current.stop();
         sourceNodeRef.current.disconnect();
         sourceNodeRef.current = null;
       } catch (error) {
-        console.error("Error stopping source node:", error);
+        // Ignore "cannot stop already stopped node" errors
+        if (!(error instanceof Error) || !error.message.includes('stopped')) {
+          console.error("Error stopping source node:", error);
+        }
       }
     }
   }, [animationRef, sourceNodeRef]);
