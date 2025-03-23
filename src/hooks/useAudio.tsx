@@ -45,13 +45,8 @@ export const useAudio = () => {
     setIsPlaying,
     setCurrentTime,
     (duration) => {
-      const startMarkerId = `start-${Date.now()}`;
-      const endMarkerId = `end-${Date.now() + 1}`;
-      
-      setMarkers([
-        { id: startMarkerId, position: 0, type: 'start' },
-        { id: endMarkerId, position: duration, type: 'end' }
-      ]);
+      // Don't automatically initialize markers - we'll let the user add them
+      // when they want to edit
       setDuration(duration);
     },
     getAudioContext,
@@ -71,6 +66,21 @@ export const useAudio = () => {
   
   // Add marker at current time
   const addMarker = (type: 'start' | 'end') => {
+    // If we don't have any markers yet and the user adds a marker,
+    // let's automatically add the other one at the appropriate position
+    if (markers.length === 0) {
+      const otherType = type === 'start' ? 'end' : 'start';
+      const otherPosition = type === 'start' ? duration : 0;
+      
+      const otherMarker: AudioMarker = {
+        id: `${otherType}-${Date.now() + 1}`,
+        position: otherPosition,
+        type: otherType as 'start' | 'end'
+      };
+      
+      setMarkers([otherMarker]);
+    }
+    
     const filteredMarkers = markers.filter(marker => marker.type !== type);
     
     const newMarker: AudioMarker = {

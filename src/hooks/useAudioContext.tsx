@@ -15,7 +15,7 @@ export const useAudioContext = () => {
         
         console.log("Created new AudioContext, state:", audioContextRef.current.state);
         
-        // Try to resume the context immediately if needed
+        // Resume the context immediately to handle browsers that start in suspended state
         if (audioContextRef.current.state === 'suspended') {
           console.log("New AudioContext is suspended, attempting to resume");
           audioContextRef.current.resume()
@@ -38,7 +38,8 @@ export const useAudioContext = () => {
       }
     };
     
-    const events = ['click', 'touchstart', 'keydown'];
+    // Add event listeners to resume context on various user actions
+    const events = ['click', 'touchstart', 'keydown', 'mousedown'];
     events.forEach(event => {
       document.addEventListener(event, resumeAudioContext, { once: true });
     });

@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { AudioMarker } from "@/hooks/useAudio";
-import { ArrowLeftToLine, ArrowRightToLine } from "lucide-react";
+import { ArrowLeftToLine, ArrowRightToLine, Scissors } from "lucide-react";
 import { AudioExporter } from "./AudioExporter";
 
 interface MarkerControlsProps {

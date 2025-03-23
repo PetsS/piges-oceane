@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { AudioPlayer } from "@/components/AudioPlayer";
@@ -8,7 +7,7 @@ import { LocalAudioLoader } from "@/components/LocalAudioLoader";
 import { useAudio } from "@/hooks/useAudio";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Cog, LogOut } from "lucide-react";
+import { Cog, LogOut, Scissors } from "lucide-react";
 
 const colorToHsl = (color: string) => {
   if (color.startsWith('hsl')) {
@@ -66,6 +65,7 @@ const colorToHsl = (color: string) => {
 const Index = () => {
   const [showAdmin, setShowAdmin] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [showMarkerControls, setShowMarkerControls] = useState(false);
   const navigate = useNavigate();
   const {
     audioFiles,
@@ -115,10 +115,12 @@ const Index = () => {
   };
 
   const handleFileSelect = (file) => {
+    setShowMarkerControls(false);
     loadAudioFile(file);
   };
 
   const handleSearch = (path, city, date, hour) => {
+    setShowMarkerControls(false);
     loadFilesFromUNC(path, city, date, hour);
   };
 
@@ -203,14 +205,28 @@ const Index = () => {
           </div>
 
           <div className="h-fit">
-            <MarkerControls
-              markers={markers}
-              onAddMarker={addMarker}
-              onExport={handleExport}
-              currentTime={currentTime}
-              formatTimeDetailed={formatTimeDetailed}
-              isExporting={isExporting}
-            />
+            {currentAudioFile && !showMarkerControls && (
+              <div className="flex justify-end mb-4">
+                <Button 
+                  onClick={() => setShowMarkerControls(true)}
+                  className="animate-fade-in"
+                >
+                  <Scissors className="h-4 w-4 mr-2" />
+                  Éditer l'audio
+                </Button>
+              </div>
+            )}
+            
+            {showMarkerControls && (
+              <MarkerControls
+                markers={markers}
+                onAddMarker={addMarker}
+                onExport={handleExport}
+                currentTime={currentTime}
+                formatTimeDetailed={formatTimeDetailed}
+                isExporting={isExporting}
+              />
+            )}
           </div>
         </div>
       </div>
