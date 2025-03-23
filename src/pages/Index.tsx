@@ -36,6 +36,10 @@ const Index = () => {
     setSelectedFile(file.name);
   };
 
+  const handlePathChange = (path: string, date: Date, hour: string | null) => {
+    loadFilesFromUNC(path, date, hour);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-secondary/30 overflow-hidden">
       {/* Header */}
@@ -58,8 +62,8 @@ const Index = () => {
             </svg>
           </div>
           <div>
-            <h1 className="text-xl font-semibold tracking-tight">Audio Marker Symphony</h1>
-            <p className="text-xs text-muted-foreground">Precision audio editing</p>
+            <h1 className="text-xl font-semibold tracking-tight">Audio Logger</h1>
+            <p className="text-xs text-muted-foreground">Hourly audio recordings</p>
           </div>
         </div>
       </header>
@@ -75,7 +79,7 @@ const Index = () => {
               files={audioFiles}
               onFileSelect={handleFileSelect}
               isLoading={isLoading}
-              onPathChange={loadFilesFromUNC}
+              onPathChange={handlePathChange}
             />
           </div>
 
@@ -101,7 +105,7 @@ const Index = () => {
                 onVolumeChange={changeVolume}
                 onSeek={seek}
                 formatTime={formatTime}
-                audioTitle={selectedFile || "Sample Audio"}
+                audioTitle={selectedFile ? `${selectedFile} (60 min)` : "No file selected"}
               />
 
               <MarkerControls

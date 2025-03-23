@@ -2,16 +2,18 @@
 import { useState } from "react";
 import { AudioFile } from "@/hooks/useAudio";
 import { cn } from "@/lib/utils";
-import { Folder, Music, Clock, FileAudio } from "lucide-react";
+import { Calendar, Folder, Search, Clock, FileAudio } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { format } from "date-fns";
+import { DatePicker } from "@/components/DatePicker";
 
 interface FileBrowserProps {
   files: AudioFile[];
   onFileSelect: (file: AudioFile) => void;
   isLoading: boolean;
-  onPathChange: (path: string) => void;
+  onPathChange: (path: string, date: Date, hour: string | null) => void;
 }
 
 export const FileBrowser = ({
@@ -20,48 +22,87 @@ export const FileBrowser = ({
   isLoading,
   onPathChange,
 }: FileBrowserProps) => {
-  const [path, setPath] = useState("\\\\server\\music");
-  const [filter, setFilter] = useState("");
+  const [basePath, setBasePath] = useState("\\\\server\\audioLogs");
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [selectedHour, setSelectedHour] = useState<string | null>(null);
 
-  const handlePathChange = () => {
-    onPathChange(path);
+  const handleSearch = () => {
+    if (!selectedDate) return;
+    
+    // Format date as YYYY-MM-DD for folder structure
+    const dateFolder = format(selectedDate, "yyyy-MM-dd");
+    
+    // Generate path using the base path, date folder, and optionally the hour file
+    const fullPath = `${basePath}\\${dateFolder}${selectedHour ? `\\${selectedHour}.mp3` : ''}`;
+    
+    onPathChange(fullPath, selectedDate, selectedHour);
   };
 
-  const filteredFiles = files.filter((file) =>
-    file.name.toLowerCase().includes(filter.toLowerCase())
+  const hours = Array.from({ length: 24 }, (_, i) => 
+    i.toString().padStart(2, '0')
   );
 
   return (
     <div className="w-full flex flex-col h-full glass-panel rounded-lg overflow-hidden animate-fade-in">
       <div className="p-4 bg-secondary/50 backdrop-blur-md border-b">
-        <h3 className="text-lg font-medium mb-4">Audio Library</h3>
+        <h3 className="text-lg font-medium mb-4">Audio Logger Search</h3>
         
         <div className="flex space-x-2 mb-4">
           <div className="relative flex-1">
             <Input
-              value={path}
-              onChange={(e) => setPath(e.target.value)}
+              value={basePath}
+              onChange={(e) => setBasePath(e.target.value)}
               className="pl-9 bg-white/50 border-0 focus-visible:ring-1"
-              placeholder="UNC Path"
+              placeholder="Base UNC Path"
             />
             <Folder className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           </div>
-          <Button 
-            onClick={handlePathChange} 
-            className="transition-all duration-300 hover:shadow-md hover:translate-y-[-1px]"
-          >
-            Connect
-          </Button>
         </div>
         
-        <div className="relative">
-          <Input
-            placeholder="Filter files..."
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            className="pl-9 bg-white/50 border-0 focus-visible:ring-1"
-          />
-          <FileAudio className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
+              <span>Select Date</span>
+            </label>
+            <DatePicker
+              date={selectedDate}
+              onSelect={setSelectedDate}
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <label className="text-sm font-medium flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              <span>Select Hour</span>
+            </label>
+            <div className="grid grid-cols-6 gap-1.5">
+              {hours.map((hour) => (
+                <Button
+                  key={hour}
+                  variant={selectedHour === hour ? "default" : "outline"}
+                  className={cn(
+                    "h-9 px-2 text-xs",
+                    selectedHour === hour 
+                      ? "bg-primary text-primary-foreground" 
+                      : "hover:bg-secondary/80"
+                  )}
+                  onClick={() => setSelectedHour(selectedHour === hour ? null : hour)}
+                >
+                  {hour}:00
+                </Button>
+              ))}
+            </div>
+          </div>
+          
+          <Button 
+            className="w-full mt-2 transition-all duration-300 hover:shadow-md hover:translate-y-[-1px]"
+            onClick={handleSearch}
+            disabled={!selectedDate}
+          >
+            <Search className="h-4 w-4 mr-2" />
+            Find Audio Files
+          </Button>
         </div>
       </div>
       
@@ -74,20 +115,20 @@ export const FileBrowser = ({
               <div className="relative">
                 <div className="h-10 w-10 rounded-full border-2 border-primary/30 border-t-primary animate-spin"></div>
               </div>
-              <p className="text-sm text-muted-foreground">Loading files...</p>
+              <p className="text-sm text-muted-foreground">Searching for audio files...</p>
             </div>
           </div>
-        ) : filteredFiles.length === 0 ? (
+        ) : files.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-            <Music className="h-12 w-12 text-muted-foreground mb-4 opacity-50" />
+            <FileAudio className="h-12 w-12 text-muted-foreground mb-4 opacity-50" />
             <p className="text-lg font-medium text-foreground/80">No audio files found</p>
             <p className="text-sm text-muted-foreground mt-1">
-              {filter ? "Try a different filter" : "Connect to a different UNC path"}
+              Try a different date or hour
             </p>
           </div>
         ) : (
           <div className="space-y-1 p-1">
-            {filteredFiles.map((file) => (
+            {files.map((file) => (
               <button
                 key={file.path}
                 onClick={() => onFileSelect(file)}
@@ -98,7 +139,7 @@ export const FileBrowser = ({
                 )}
               >
                 <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 mr-3">
-                  <Music className="h-5 w-5 text-primary" />
+                  <FileAudio className="h-5 w-5 text-primary" />
                 </div>
                 <div className="flex-1 overflow-hidden">
                   <div className="font-medium truncate">{file.name}</div>

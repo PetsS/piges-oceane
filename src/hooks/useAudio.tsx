@@ -1,6 +1,6 @@
-
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
+import { format } from 'date-fns';
 
 export interface AudioMarker {
   id: string;
@@ -29,57 +29,50 @@ export const useAudio = () => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const animationRef = useRef<number | null>(null);
 
-  // This is a mock function to simulate loading files from a UNC path
-  // In a real implementation, this would connect to a backend service
-  const loadFilesFromUNC = useCallback(async (path: string) => {
+  const loadFilesFromUNC = useCallback(async (path: string, date: Date, hour: string | null) => {
     setIsLoading(true);
     
-    // Simulate API call to get files from UNC path
     setTimeout(() => {
-      const mockFiles: AudioFile[] = [
-        {
-          name: 'Piano Sonata.mp3',
-          path: '/audio/piano_sonata.mp3',
-          size: '8.2 MB',
-          type: 'audio/mpeg',
-          lastModified: '2024-06-10'
-        },
-        {
-          name: 'Jazz Ensemble.wav',
-          path: '/audio/jazz_ensemble.wav',
-          size: '24.6 MB',
-          type: 'audio/wav',
-          lastModified: '2024-06-12'
-        },
-        {
-          name: 'Podcast Interview.mp3',
-          path: '/audio/podcast_interview.mp3',
-          size: '18.7 MB',
-          type: 'audio/mpeg',
-          lastModified: '2024-06-15'
-        },
-        {
-          name: 'Classical Symphony.mp3',
-          path: '/audio/classical_symphony.mp3',
-          size: '32.1 MB',
-          type: 'audio/mpeg',
-          lastModified: '2024-06-02'
-        }
-      ];
+      const dateStr = format(date, 'yyyy-MM-dd');
       
-      setAudioFiles(mockFiles);
+      if (hour) {
+        const mockFile: AudioFile = {
+          name: `${hour}.mp3`,
+          path: `\\\\server\\audioLogs\\${dateStr}\\${hour}.mp3`,
+          size: '58.2 MB',
+          type: 'audio/mpeg',
+          lastModified: format(date, 'yyyy-MM-dd')
+        };
+        
+        setAudioFiles([mockFile]);
+        
+        loadAudioFile(mockFile);
+      } else {
+        const mockFiles: AudioFile[] = Array.from({ length: 24 }, (_, i) => {
+          const hourStr = i.toString().padStart(2, '0');
+          return {
+            name: `${hourStr}.mp3`,
+            path: `\\\\server\\audioLogs\\${dateStr}\\${hourStr}.mp3`,
+            size: `${Math.floor(50 + Math.random() * 10)}.${Math.floor(Math.random() * 10)}MB`,
+            type: 'audio/mpeg',
+            lastModified: format(date, 'yyyy-MM-dd')
+          };
+        });
+        
+        setAudioFiles(mockFiles);
+      }
+      
       setIsLoading(false);
     }, 1500);
   }, []);
 
-  // Initialize with demo audio
   useEffect(() => {
-    // In a real implementation, we would not hardcode this URL
-    setAudioSrc('https://audio-samples.github.io/samples/mp3/blizzard_biased/blizzard_01.mp3');
-    loadFilesFromUNC('\\\\server\\music');
+    const today = new Date();
+    const currentHour = today.getHours().toString().padStart(2, '0');
+    
+    loadFilesFromUNC(`\\\\server\\audioLogs`, today, currentHour);
   }, [loadFilesFromUNC]);
 
-  // Create audio element when source changes
   useEffect(() => {
     if (!audioSrc) return;
     
@@ -108,12 +101,10 @@ export const useAudio = () => {
       }
     };
     
-    // Audio events
     audio.addEventListener('loadeddata', setAudioData);
     audio.addEventListener('timeupdate', setAudioTime);
     audio.addEventListener('ended', onEnded);
     
-    // Set volume
     audio.volume = volume;
     
     return () => {
@@ -123,7 +114,6 @@ export const useAudio = () => {
     };
   }, [audioSrc, volume]);
 
-  // Animation frame for smoother time updates
   const animateTime = () => {
     if (audioRef.current) {
       setCurrentTime(audioRef.current.currentTime);
@@ -131,7 +121,6 @@ export const useAudio = () => {
     }
   };
 
-  // Play/Pause functionality
   const togglePlay = () => {
     if (!audioRef.current) return;
     
@@ -155,7 +144,6 @@ export const useAudio = () => {
     }
   };
 
-  // Seek functionality
   const seek = (time: number) => {
     if (!audioRef.current) return;
     
@@ -163,7 +151,6 @@ export const useAudio = () => {
     setCurrentTime(time);
   };
 
-  // Set volume
   const changeVolume = (value: number) => {
     if (!audioRef.current) return;
     
@@ -172,9 +159,7 @@ export const useAudio = () => {
     setVolume(newVolume);
   };
 
-  // Add marker at current position
   const addMarker = (type: 'start' | 'end') => {
-    // Remove existing marker of the same type
     const filteredMarkers = markers.filter(marker => marker.type !== type);
     
     const newMarker: AudioMarker = {
@@ -188,12 +173,10 @@ export const useAudio = () => {
     toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} marker set at ${formatTime(currentTime)}`);
   };
 
-  // Remove marker
   const removeMarker = (id: string) => {
     setMarkers(markers.filter(marker => marker.id !== id));
   };
 
-  // Export trimmed audio
   const exportTrimmedAudio = async () => {
     if (!audioRef.current || !audioSrc) {
       toast.error('No audio loaded');
@@ -216,19 +199,18 @@ export const useAudio = () => {
       return;
     }
     
-    // In a real implementation, we would send this to a backend for processing
-    // Here we'll just show a mock download process
-    toast.success('Processing audio...', { duration: 2000 });
+    toast.success('Processing audio segment...', { duration: 2000 });
     
-    // Simulate processing time
+    const pathParts = audioSrc.split('\\');
+    const fileName = pathParts[pathParts.length - 1];
+    const dateFolder = pathParts[pathParts.length - 2];
+    
+    const exportFileName = `${dateFolder}_${fileName.replace('.mp3', '')}_${formatTime(startTime).replace(':', '')}-${formatTime(endTime).replace(':', '')}.mp3`;
+    
     setTimeout(() => {
-      const fileName = audioSrc.split('/').pop() || 'trimmed_audio.mp3';
-      const trimmedFileName = `trimmed_${fileName}`;
-      
-      // In a real app, this would be the URL to the processed file
       const mockDownloadUrl = audioSrc;
       
-      toast.success(`Download ready: ${trimmedFileName}`, {
+      toast.success(`Export ready: ${exportFileName}`, {
         description: `Trimmed from ${formatTime(startTime)} to ${formatTime(endTime)}`,
         action: {
           label: 'Download',
@@ -239,10 +221,7 @@ export const useAudio = () => {
     }, 3000);
   };
 
-  // Load a selected audio file
   const loadAudioFile = (file: AudioFile) => {
-    // In a real implementation, this would resolve the UNC path
-    // For now, we'll just use our demo URL again but with a delay to simulate loading
     setIsLoading(true);
     
     setTimeout(() => {
@@ -256,14 +235,12 @@ export const useAudio = () => {
     }, 1500);
   };
 
-  // Format time in MM:SS format
   const formatTime = (time: number) => {
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  // Format time for display with milliseconds
   const formatTimeDetailed = (time: number) => {
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
