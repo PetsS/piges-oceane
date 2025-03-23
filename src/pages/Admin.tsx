@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Label } from "@/components/ui/label";
 import { ColorPicker } from "@/components/ColorPicker";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogClose,
+} from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 interface User {
   username: string;
@@ -38,6 +50,11 @@ const Admin = () => {
     },
     audioFolderPath: "\\\\server\\audioLogs",
   });
+  
+  // Password change states
+  const [selectedUser, setSelectedUser] = useState<string | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   // Check if current user is admin
   useEffect(() => {
@@ -110,6 +127,40 @@ const Admin = () => {
     document.documentElement.style.setProperty('--accent', colorToHsl(settings.buttonColors.accent));
     
     toast.success("Paramètres enregistrés avec succès");
+  };
+
+  const handleChangePassword = () => {
+    if (!selectedUser) return;
+    
+    if (newPassword.length < 4) {
+      toast.error("Le mot de passe doit contenir au moins 4 caractères");
+      return;
+    }
+    
+    if (newPassword !== confirmPassword) {
+      toast.error("Les mots de passe ne correspondent pas");
+      return;
+    }
+    
+    const updatedUsers = users.map(user => {
+      if (user.username === selectedUser) {
+        return {
+          ...user,
+          password: newPassword
+        };
+      }
+      return user;
+    });
+    
+    setUsers(updatedUsers);
+    localStorage.setItem("users", JSON.stringify(updatedUsers));
+    
+    // Reset state
+    setSelectedUser(null);
+    setNewPassword("");
+    setConfirmPassword("");
+    
+    toast.success(`Mot de passe modifié pour ${selectedUser}`);
   };
 
   // Convert hex or rgb color to HSL format for CSS variables
@@ -238,14 +289,88 @@ const Admin = () => {
                             {user.isAdmin ? "Administrateur" : "Utilisateur standard"}
                           </p>
                         </div>
-                        <Button 
-                          variant="destructive" 
-                          size="sm"
-                          onClick={() => handleDeleteUser(user.username)}
-                          disabled={user.username === "admin"}
-                        >
-                          Supprimer
-                        </Button>
+                        <div className="flex space-x-2">
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedUser(user.username);
+                                  setNewPassword("");
+                                  setConfirmPassword("");
+                                }}
+                              >
+                                Modifier mot de passe
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-[425px]">
+                              <DialogHeader>
+                                <DialogTitle>Modifier le mot de passe</DialogTitle>
+                                <DialogDescription>
+                                  Définir un nouveau mot de passe pour {selectedUser}
+                                </DialogDescription>
+                              </DialogHeader>
+                              <div className="grid gap-4 py-4">
+                                <div className="space-y-2">
+                                  <Label htmlFor="new-password">Nouveau mot de passe</Label>
+                                  <Input
+                                    id="new-password"
+                                    type="password"
+                                    value={newPassword}
+                                    onChange={(e) => setNewPassword(e.target.value)}
+                                    placeholder="Nouveau mot de passe"
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label htmlFor="confirm-password">Confirmer le mot de passe</Label>
+                                  <Input
+                                    id="confirm-password"
+                                    type="password"
+                                    value={confirmPassword}
+                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                    placeholder="Confirmer le mot de passe"
+                                  />
+                                </div>
+                              </div>
+                              <DialogFooter>
+                                <DialogClose asChild>
+                                  <Button variant="outline">Annuler</Button>
+                                </DialogClose>
+                                <DialogClose asChild>
+                                  <Button onClick={handleChangePassword}>Enregistrer</Button>
+                                </DialogClose>
+                              </DialogFooter>
+                            </DialogContent>
+                          </Dialog>
+                          
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button 
+                                variant="destructive" 
+                                size="sm"
+                                disabled={user.username === "admin"}
+                              >
+                                Supprimer
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Êtes-vous sûr ?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Cette action supprimera définitivement l'utilisateur {user.username} 
+                                  et ne peut pas être annulée.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Annuler</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDeleteUser(user.username)}>
+                                  Supprimer
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
                       </div>
                     ))}
                   </div>
