@@ -104,10 +104,6 @@ export const useAudioFiles = (
           console.log("Creating synthetic audio for network file");
           const ctx = getAudioContext();
           if (ctx) {
-            if (!audioRef.current) {
-              audioRef.current = new Audio();
-            }
-            
             setAudioSrc('synthetic-audio');
             setIsPlaying(false);
             setCurrentTime(0);

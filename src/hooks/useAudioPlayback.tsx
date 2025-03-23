@@ -1,5 +1,6 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { toast } from 'sonner';
 import { useAudioContext } from './useAudioContext';
 import { useAudioMarkers } from './useAudioMarkers';
 import { useAudioFormatting } from './useAudioFormatting';
@@ -14,11 +15,30 @@ export const useAudioPlayback = () => {
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const animationRef = useRef<number | null>(null);
+  const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
   
   const { audioContextRef, getAudioContext } = useAudioContext();
   const { formatTime, formatTimeDetailed } = useAudioFormatting();
   const { markers, addMarker, removeMarker, initializeMarkers, setMarkers } = useAudioMarkers(formatTime);
 
+  // Clean up animation frame and audio element
+  const cleanup = useCallback(() => {
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+      animationRef.current = null;
+    }
+    
+    if (sourceNodeRef.current) {
+      try {
+        sourceNodeRef.current.stop();
+        sourceNodeRef.current.disconnect();
+        sourceNodeRef.current = null;
+      } catch (error) {
+        console.error("Error stopping source node:", error);
+      }
+    }
+  }, []);
+  
   const animateTime = useCallback(() => {
     if (audioRef.current) {
       setCurrentTime(audioRef.current.currentTime);
@@ -164,13 +184,21 @@ export const useAudioPlayback = () => {
   useEffect(() => {
     if (!audioSrc) return;
     
-    if (audioRef.current && audioRef.current.src !== audioSrc) {
-      audioRef.current.pause();
-      audioRef.current.src = '';
+    // Clean up previous audio elements and resources
+    cleanup();
+    
+    if (isPlaying) {
+      setIsPlaying(false);
     }
     
+    // Create a new audio element if needed
     if (!audioRef.current) {
       audioRef.current = new Audio();
+    } else {
+      // Reset existing audio element
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      audioRef.current.src = '';
     }
     
     console.log("Setting audio source to:", audioSrc);
@@ -192,10 +220,7 @@ export const useAudioPlayback = () => {
     const onEnded = () => {
       setIsPlaying(false);
       setCurrentTime(0);
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-        animationRef.current = null;
-      }
+      cleanup();
     };
     
     const onError = (e: any) => {
@@ -207,6 +232,9 @@ export const useAudioPlayback = () => {
         try {
           const audioContext = getAudioContext();
           if (audioContext) {
+            // Clean up any existing oscillator
+            cleanup();
+            
             const oscillator = audioContext.createOscillator();
             const gainNode = audioContext.createGain();
             
@@ -285,19 +313,24 @@ export const useAudioPlayback = () => {
       audio.removeEventListener('ended', onEnded);
       audio.removeEventListener('error', onError);
       clearTimeout(bufferTimeout);
+      
+      // Cleanup resources for this effect
+      if (audio.src) {
+        audio.pause();
+        audio.src = '';
+      }
     };
-  }, [audioSrc, volume, fetchAndDecodeAudio, getAudioContext, initializeMarkers]);
+  }, [audioSrc, volume, fetchAndDecodeAudio, getAudioContext, initializeMarkers, cleanup, isPlaying]);
 
   // Clean up resources when component unmounts
   useEffect(() => {
     return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
+      cleanup();
       
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.src = '';
+        audioRef.current = null;
       }
       
       if (audioContextRef.current) {
@@ -312,7 +345,7 @@ export const useAudioPlayback = () => {
         URL.revokeObjectURL(audioSrc);
       }
     };
-  }, [audioSrc, audioContextRef]);
+  }, [audioSrc, audioContextRef, cleanup]);
 
   return {
     audioSrc,
