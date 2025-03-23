@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { useAudioContext } from './useAudioContext';
@@ -26,7 +25,6 @@ export const useAudioPlayback = () => {
   const { markers, addMarker, removeMarker, initializeMarkers, setMarkers } = useAudioMarkers(formatTime);
   const { fetchAndDecodeAudio } = useAudioBufferDecoder(getAudioContext);
   
-  // Clean up animation frame and audio element
   const { cleanup } = useAudioCleanup(animationRef, sourceNodeRef);
   
   const animateTime = useCallback(() => {
@@ -36,7 +34,6 @@ export const useAudioPlayback = () => {
     }
   }, []);
 
-  // Import event handlers for audio elements
   const { setupAudioEvents } = useAudioEventHandlers({
     audioRef,
     setDuration,
@@ -59,32 +56,62 @@ export const useAudioPlayback = () => {
     if (!isPlaying) {
       console.log("Attempting to play audio", audioRef.current.src);
       
-      // For local files check if we have a valid audio element
       if (audioRef.current.src) {
-        // Add buffering indicator
         setIsBuffering(true);
         
-        // Ensure the audio context is running (needed for Chrome's autoplay policy)
         const ctx = getAudioContext();
         if (ctx && ctx.state === 'suspended') {
           ctx.resume().catch(console.error);
         }
         
-        audioRef.current.play()
-          .then(() => {
-            console.log("Audio playing successfully");
-            setIsPlaying(true);
+        audioRef.current.load();
+        
+        setTimeout(() => {
+          const playPromise = audioRef.current?.play();
+          
+          if (playPromise !== undefined) {
+            playPromise
+              .then(() => {
+                console.log("Audio playing successfully");
+                setIsPlaying(true);
+                setIsBuffering(false);
+                animationRef.current = requestAnimationFrame(animateTime);
+              })
+              .catch(error => {
+                console.error('Error playing audio:', error);
+                setIsBuffering(false);
+                
+                if (ctx && ctx.state === 'suspended') {
+                  ctx.resume()
+                    .then(() => {
+                      audioRef.current?.play()
+                        .then(() => {
+                          setIsPlaying(true);
+                          setIsBuffering(false);
+                          animationRef.current = requestAnimationFrame(animateTime);
+                        })
+                        .catch(secondError => {
+                          console.error('Second attempt to play audio failed:', secondError);
+                          toast.error('Failed to play audio. Please try again.');
+                        });
+                    })
+                    .catch(err => {
+                      console.error('Failed to resume audio context:', err);
+                      toast.error('Failed to play audio. Please try again.');
+                    });
+                } else {
+                  toast.error('Failed to play audio. Please try again.');
+                }
+              });
+          } else {
             setIsBuffering(false);
-            animationRef.current = requestAnimationFrame(animateTime);
-          })
-          .catch(error => {
-            console.error('Error playing audio:', error);
-            setIsBuffering(false);
-            toast.error('Failed to play audio. Please try again.');
-          });
+            toast.error('Cannot play this audio file');
+          }
+        }, 100);
       } else {
         console.error("No audio source available");
         toast.error("No audio source available to play");
+        setIsBuffering(false);
       }
     } else {
       console.log("Pausing audio");
@@ -100,27 +127,22 @@ export const useAudioPlayback = () => {
   const seek = useCallback((time: number) => {
     if (!audioRef.current) return;
     
-    // For large files, seeking can take time - show buffering state
     setIsBuffering(true);
     
     const seekOperation = () => {
       audioRef.current!.currentTime = time;
       setCurrentTime(time);
       
-      // Hide buffering after a short delay
       setTimeout(() => setIsBuffering(false), 300);
     };
     
-    // For large files, we may need to pause briefly before seeking to avoid browser lockups
-    if (isPlaying && audioRef.current.duration > 1800) { // For files over 30 minutes
+    if (isPlaying && audioRef.current.duration > 1800) {
       const wasPlaying = isPlaying;
       audioRef.current.pause();
       
-      // Small delay before seeking to allow browser to process
       setTimeout(() => {
         seekOperation();
         
-        // Resume playback if it was playing
         if (wasPlaying) {
           audioRef.current!.play()
             .catch(error => {
@@ -143,28 +165,23 @@ export const useAudioPlayback = () => {
     setVolume(newVolume);
   }, []);
 
-  // Set up audio element and load audio data when audioSrc changes
   useEffect(() => {
     if (!audioSrc) return;
     
-    // Clean up previous audio elements and resources
     cleanup();
     
     if (isPlaying) {
       setIsPlaying(false);
     }
     
-    // Create a new audio element if needed
     if (!audioRef.current) {
       const audio = new Audio();
       audioRef.current = audio;
     }
     
-    // Reset existing audio element
     audioRef.current.pause();
     audioRef.current.currentTime = 0;
     
-    // Make sure we don't have an old src before setting a new one
     if (audioRef.current.src) {
       audioRef.current.removeAttribute('src');
       audioRef.current.load();
@@ -172,19 +189,15 @@ export const useAudioPlayback = () => {
     
     console.log("Setting audio source to:", audioSrc);
     
-    // Configure for efficient playback of large files - AFTER removing previous src
-    audioRef.current.preload = "metadata"; // Only preload metadata initially
-    audioRef.current.crossOrigin = "anonymous"; // Add this to handle CORS
+    audioRef.current.preload = "auto";
+    audioRef.current.crossOrigin = "anonymous";
     audioRef.current.volume = volume;
     
-    // Ensure we have a valid audio source
     if (audioSrc && audioSrc !== 'synthetic-audio') {
       audioRef.current.src = audioSrc;
       
-      // Set up audio event handlers
       const cleanupEvents = setupAudioEvents(audioSrc);
       
-      // Return cleanup function
       return () => {
         cleanupEvents();
         
@@ -197,12 +210,10 @@ export const useAudioPlayback = () => {
         setIsBuffering(false);
       };
     } else {
-      // Handle synthetic audio case
       setIsBuffering(false);
     }
-  }, [audioSrc, volume, cleanup, isPlaying, setupAudioEvents]);
+  }, [audioSrc, volume, cleanup, isPlaying, setupAudioEvents, getAudioContext]);
 
-  // Clean up resources when component unmounts
   useEffect(() => {
     return () => {
       cleanup();

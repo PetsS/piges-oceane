@@ -13,7 +13,12 @@ export const useAudioBufferDecoder = (getAudioContext: () => AudioContext | null
       
       // Resume the audio context if suspended (needed for Chrome's autoplay policy)
       if (audioContext.state === 'suspended') {
-        await audioContext.resume();
+        try {
+          await audioContext.resume();
+          console.log("AudioContext resumed successfully");
+        } catch (resumeError) {
+          console.error("Failed to resume AudioContext:", resumeError);
+        }
       }
       
       // For local files (blob URLs)
@@ -29,6 +34,11 @@ export const useAudioBufferDecoder = (getAudioContext: () => AudioContext | null
           
           const arrayBuffer = await response.arrayBuffer();
           console.log("Blob URL fetched successfully, buffer size:", arrayBuffer.byteLength);
+          
+          if (arrayBuffer.byteLength === 0) {
+            console.error("Error: Empty array buffer received");
+            throw new Error("Empty audio file");
+          }
           
           try {
             // Decode the audio data

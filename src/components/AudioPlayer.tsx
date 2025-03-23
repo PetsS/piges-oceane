@@ -1,5 +1,5 @@
 
-import { useState, useCallback, memo } from "react";
+import { useState, useCallback, memo, useEffect } from "react";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { 
@@ -43,8 +43,18 @@ export const AudioPlayer = memo(({
   isBuffering = false,
 }: AudioPlayerProps) => {
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
+  const [playbackEnabled, setPlaybackEnabled] = useState(false);
   
   const playbackPercentage = duration > 0 ? (currentTime / duration) * 100 : 0;
+  
+  // Enable playback controls once audio is loaded
+  useEffect(() => {
+    if (duration > 0 && !isLoading) {
+      setPlaybackEnabled(true);
+    } else {
+      setPlaybackEnabled(false);
+    }
+  }, [duration, isLoading]);
   
   const handleSkipBack = useCallback(() => {
     onSeek(Math.max(0, currentTime - 10));
@@ -63,6 +73,16 @@ export const AudioPlayer = memo(({
     if (volume < 0.5) return <Volume1 className="h-5 w-5" />;
     return <Volume2 className="h-5 w-5" />;
   }, [volume]);
+
+  // Handle play/pause with improved error catching
+  const handlePlayPause = useCallback(() => {
+    try {
+      console.log("Play/pause button clicked");
+      onPlayPause();
+    } catch (error) {
+      console.error("Error in play/pause handler:", error);
+    }
+  }, [onPlayPause]);
 
   return (
     <div className="glass-panel rounded-lg p-4 animate-fade-in">
@@ -116,7 +136,7 @@ export const AudioPlayer = memo(({
             max={100}
             step={0.1}
             onValueChange={(value) => onSeek((value[0] / 100) * duration)}
-            disabled={duration === 0 || isLoading}
+            disabled={!playbackEnabled || isLoading}
             className="cursor-pointer"
           />
           <div className="flex justify-between text-xs text-muted-foreground">
@@ -131,7 +151,7 @@ export const AudioPlayer = memo(({
             size="icon"
             className="rounded-full h-10 w-10"
             onClick={handleSkipBack}
-            disabled={duration === 0 || isLoading || isBuffering}
+            disabled={!playbackEnabled || isLoading || isBuffering}
           >
             <ChevronsLeft className="h-5 w-5" />
           </Button>
@@ -140,8 +160,8 @@ export const AudioPlayer = memo(({
             variant="default"
             size="icon"
             className="rounded-full h-14 w-14 transition-all hover:scale-105 active:scale-95"
-            onClick={onPlayPause}
-            disabled={duration === 0 || isLoading}
+            onClick={handlePlayPause}
+            disabled={!playbackEnabled || isLoading}
           >
             {isBuffering ? (
               <Loader2 className="h-6 w-6 animate-spin" />
@@ -157,7 +177,7 @@ export const AudioPlayer = memo(({
             size="icon"
             className="rounded-full h-10 w-10"
             onClick={handleSkipForward}
-            disabled={duration === 0 || isLoading || isBuffering}
+            disabled={!playbackEnabled || isLoading || isBuffering}
           >
             <ChevronsRight className="h-5 w-5" />
           </Button>
