@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useAudio } from "@/hooks/useAudio";
 import { AudioPlayer } from "@/components/AudioPlayer";
@@ -63,7 +62,6 @@ const Index = () => {
           </div>
           <div>
             <h1 className="text-xl font-semibold tracking-tight">Enregistreur Audio</h1>
-            <p className="text-xs text-muted-foreground">Enregistrements audio horaires</p>
           </div>
         </div>
       </header>

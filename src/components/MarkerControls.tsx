@@ -144,7 +144,7 @@ export const MarkerControls = ({
         className="w-full mt-auto transition-all duration-300 hover:shadow-md hover:translate-y-[-1px]"
       >
         <Scissors className="h-4 w-4 mr-2" />
-        Exporter l'audio découpé
+        Exporter l'audio
       </Button>
     </div>
   );

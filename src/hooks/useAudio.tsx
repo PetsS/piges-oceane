@@ -86,6 +86,15 @@ export const useAudio = () => {
     
     const setAudioData = () => {
       setDuration(audio.duration);
+      
+      // Set default markers at the beginning and end of the file
+      const startMarkerId = `start-${Date.now()}`;
+      const endMarkerId = `end-${Date.now() + 1}`;
+      
+      setMarkers([
+        { id: startMarkerId, position: 0, type: 'start' },
+        { id: endMarkerId, position: audio.duration, type: 'end' }
+      ]);
     };
     
     const setAudioTime = () => {
@@ -170,7 +179,7 @@ export const useAudio = () => {
     
     setMarkers([...filteredMarkers, newMarker]);
     
-    toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} marker set at ${formatTime(currentTime)}`);
+    toast.success(`Marqueur ${type === 'start' ? 'début' : 'fin'} défini à ${formatTime(currentTime)}`);
   };
 
   const removeMarker = (id: string) => {
@@ -226,12 +235,13 @@ export const useAudio = () => {
     
     setTimeout(() => {
       setAudioSrc('https://audio-samples.github.io/samples/mp3/blizzard_biased/blizzard_01.mp3');
-      setMarkers([]);
+      
+      // Markers will be set in the setAudioData function when the audio loads
       setIsPlaying(false);
       setCurrentTime(0);
       setIsLoading(false);
       
-      toast.success(`Loaded: ${file.name}`);
+      toast.success(`Chargé: ${file.name}`);
     }, 1500);
   };
 
