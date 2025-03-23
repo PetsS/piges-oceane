@@ -63,11 +63,19 @@ const Admin = () => {
     if (!currentUser || currentUser !== "admin") {
       toast.error("Accès refusé. Seuls les administrateurs peuvent accéder à cette page.");
       navigate("/");
+      return;
     }
 
     const savedUsers = localStorage.getItem("users");
     if (savedUsers) {
-      setUsers(JSON.parse(savedUsers));
+      try {
+        const parsedUsers = JSON.parse(savedUsers);
+        setUsers(Array.isArray(parsedUsers) ? parsedUsers : []);
+      } catch (error) {
+        console.error("Error parsing users from localStorage:", error);
+        setUsers([{ username: "admin", password: "password", isAdmin: true }]);
+        localStorage.setItem("users", JSON.stringify([{ username: "admin", password: "password", isAdmin: true }]));
+      }
     } else {
       const defaultUsers = [
         { username: "admin", password: "password", isAdmin: true }
@@ -78,11 +86,20 @@ const Admin = () => {
 
     const savedSettings = localStorage.getItem("appSettings");
     if (savedSettings) {
-      setSettings(JSON.parse(savedSettings));
+      try {
+        const parsedSettings = JSON.parse(savedSettings);
+        if (!parsedSettings.cities || !Array.isArray(parsedSettings.cities)) {
+          parsedSettings.cities = ["paris", "lyon", "marseille", "bordeaux"];
+        }
+        setSettings(parsedSettings);
+      } catch (error) {
+        console.error("Error parsing settings from localStorage:", error);
+        localStorage.setItem("appSettings", JSON.stringify(settings));
+      }
     } else {
       localStorage.setItem("appSettings", JSON.stringify(settings));
     }
-  }, []);
+  }, [navigate]);
 
   const handleAddUser = () => {
     if (!newUser.username || !newUser.password) {
@@ -302,7 +319,7 @@ const Admin = () => {
                 <div className="space-y-2">
                   <h3 className="text-lg font-medium">Utilisateurs existants</h3>
                   <div className="border rounded-md divide-y">
-                    {users.map((user) => (
+                    {users && users.length > 0 ? users.map((user) => (
                       <div key={user.username} className="p-4 flex justify-between items-center">
                         <div>
                           <p className="font-medium">{user.username}</p>
@@ -393,7 +410,11 @@ const Admin = () => {
                           </AlertDialog>
                         </div>
                       </div>
-                    ))}
+                    )) : (
+                      <div className="p-4 text-center text-muted-foreground">
+                        Aucun utilisateur trouvé
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -552,7 +573,7 @@ const Admin = () => {
                 <div className="space-y-2">
                   <h3 className="text-lg font-medium">Villes disponibles</h3>
                   <div className="border rounded-md divide-y">
-                    {settings.cities.map((city) => (
+                    {settings.cities && settings.cities.length > 0 ? settings.cities.map((city) => (
                       <div key={city} className="p-4 flex justify-between items-center">
                         <div>
                           <p className="font-medium">{city.charAt(0).toUpperCase() + city.slice(1)}</p>
@@ -567,7 +588,11 @@ const Admin = () => {
                           </Button>
                         </div>
                       </div>
-                    ))}
+                    )) : (
+                      <div className="p-4 text-center text-muted-foreground">
+                        Aucune ville configurée
+                      </div>
+                    )}
                   </div>
                 </div>
                 
