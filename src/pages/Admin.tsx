@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -71,7 +70,6 @@ const Admin = () => {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
-  // Migrate old format if needed
   const migrateOldCityFormat = (cities: any[]): CityFolder[] => {
     if (cities.length > 0 && typeof cities[0] === 'string') {
       return cities.map(city => ({
@@ -113,7 +111,6 @@ const Admin = () => {
       try {
         const parsedSettings = JSON.parse(savedSettings);
         
-        // Make sure cities exist and are in the right format
         if (!parsedSettings.cities || !Array.isArray(parsedSettings.cities)) {
           parsedSettings.cities = [
             { displayName: "Paris", folderName: "paris" },
@@ -122,7 +119,6 @@ const Admin = () => {
             { displayName: "Bordeaux", folderName: "bordeaux" }
           ];
         } else {
-          // Migrate from old format if needed
           parsedSettings.cities = migrateOldCityFormat(parsedSettings.cities);
         }
         
@@ -168,7 +164,6 @@ const Admin = () => {
   };
 
   const handleSaveSettings = () => {
-    // Immediately save the current state of settings to localStorage
     localStorage.setItem("appSettings", JSON.stringify(settings));
     
     document.documentElement.style.setProperty('--primary', colorToHsl(settings.buttonColors.primary));
@@ -230,11 +225,9 @@ const Admin = () => {
       folderName: folderNameLower 
     }];
     
-    // Update the settings state with the new cities
     const updatedSettings = {...settings, cities: updatedCities};
     setSettings(updatedSettings);
     
-    // Save to localStorage immediately
     localStorage.setItem("appSettings", JSON.stringify(updatedSettings));
     
     setNewCityDisplayName("");
@@ -251,11 +244,9 @@ const Admin = () => {
     
     const updatedCities = cities.filter(city => city.folderName !== folderName);
     
-    // Update settings with the filtered cities
     const updatedSettings = {...settings, cities: updatedCities};
     setSettings(updatedSettings);
     
-    // Save to localStorage immediately
     localStorage.setItem("appSettings", JSON.stringify(updatedSettings));
     
     toast.success(`Ville supprimée de la liste`);
@@ -270,11 +261,11 @@ const Admin = () => {
     }
     
     const cities = settings.cities as CityFolder[];
+    const originalFolderName = editingCity.folderName;
     const folderNameLower = editingCity.folderName.trim().toLowerCase();
     
-    // Check if another city uses the same folder name
     const duplicateFolder = cities.some(
-      city => city.folderName !== editingCity.folderName && 
+      city => city.folderName !== originalFolderName && 
               city.folderName === folderNameLower
     );
     
@@ -284,7 +275,7 @@ const Admin = () => {
     }
     
     const updatedCities = cities.map(city => {
-      if (city.folderName === editingCity.folderName) {
+      if (city.folderName === originalFolderName) {
         return {
           displayName: editingCity.displayName.trim(),
           folderName: folderNameLower
@@ -293,11 +284,9 @@ const Admin = () => {
       return city;
     });
     
-    // Update settings with modified cities
     const updatedSettings = {...settings, cities: updatedCities};
     setSettings(updatedSettings);
     
-    // Save to localStorage immediately
     localStorage.setItem("appSettings", JSON.stringify(updatedSettings));
     
     setEditingCity(null);
@@ -778,3 +767,4 @@ const Admin = () => {
 };
 
 export default Admin;
+
