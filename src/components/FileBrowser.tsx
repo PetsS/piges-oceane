@@ -69,7 +69,10 @@ export const FileBrowser = ({
             } else {
               // New format
               setCities(settings.cities);
-              setSelectedCityFolder(settings.cities[0]?.folderName || "paris");
+              // Make sure we have a valid default selection
+              if (settings.cities.length > 0) {
+                setSelectedCityFolder(settings.cities[0]?.folderName || "paris");
+              }
             }
           }
         }

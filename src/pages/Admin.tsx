@@ -168,6 +168,7 @@ const Admin = () => {
   };
 
   const handleSaveSettings = () => {
+    // Immediately save the current state of settings to localStorage
     localStorage.setItem("appSettings", JSON.stringify(settings));
     
     document.documentElement.style.setProperty('--primary', colorToHsl(settings.buttonColors.primary));
@@ -229,7 +230,13 @@ const Admin = () => {
       folderName: folderNameLower 
     }];
     
-    setSettings({...settings, cities: updatedCities});
+    // Update the settings state with the new cities
+    const updatedSettings = {...settings, cities: updatedCities};
+    setSettings(updatedSettings);
+    
+    // Save to localStorage immediately
+    localStorage.setItem("appSettings", JSON.stringify(updatedSettings));
+    
     setNewCityDisplayName("");
     setNewCityFolderName("");
     toast.success(`Ville "${newCityDisplayName}" ajoutée à la liste`);
@@ -243,7 +250,14 @@ const Admin = () => {
     }
     
     const updatedCities = cities.filter(city => city.folderName !== folderName);
-    setSettings({...settings, cities: updatedCities});
+    
+    // Update settings with the filtered cities
+    const updatedSettings = {...settings, cities: updatedCities};
+    setSettings(updatedSettings);
+    
+    // Save to localStorage immediately
+    localStorage.setItem("appSettings", JSON.stringify(updatedSettings));
+    
     toast.success(`Ville supprimée de la liste`);
   };
 
@@ -279,7 +293,13 @@ const Admin = () => {
       return city;
     });
     
-    setSettings({...settings, cities: updatedCities});
+    // Update settings with modified cities
+    const updatedSettings = {...settings, cities: updatedCities};
+    setSettings(updatedSettings);
+    
+    // Save to localStorage immediately
+    localStorage.setItem("appSettings", JSON.stringify(updatedSettings));
+    
     setEditingCity(null);
     toast.success("Ville modifiée avec succès");
   };
