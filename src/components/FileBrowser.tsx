@@ -6,7 +6,7 @@ import { Calendar, Search, Clock, FileAudio, MapPin } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { format } from "date-fns";
+import { format, isToday } from "date-fns";
 import { DatePicker } from "@/components/DatePicker";
 import { 
   Select,
@@ -45,6 +45,16 @@ export const FileBrowser = ({
     { displayName: "Bordeaux", folderName: "bordeaux" }
   ]);
   const [isLocalPath, setIsLocalPath] = useState(false);
+  const [currentHour, setCurrentHour] = useState<number>(new Date().getHours());
+
+  // Update current hour every minute
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentHour(new Date().getHours());
+    }, 60000); // every minute
+
+    return () => clearInterval(interval);
+  }, []);
 
   // Load audio folder path and cities from settings
   useEffect(() => {
@@ -106,6 +116,14 @@ export const FileBrowser = ({
     onPathChange(fullPath, selectedCityFolder, selectedDate, selectedHour);
   };
 
+  const isHourDisabled = (hour: number): boolean => {
+    // If the selected date is today, disable future hours
+    if (selectedDate && isToday(selectedDate)) {
+      return hour >= currentHour;
+    }
+    return false;
+  };
+
   const hours = Array.from({ length: 24 }, (_, i) => 
     i.toString().padStart(2, '0')
   );
@@ -153,21 +171,28 @@ export const FileBrowser = ({
               <span>Sélectionner une heure</span>
             </label>
             <div className="grid grid-cols-6 gap-1.5">
-              {hours.map((hour) => (
-                <Button
-                  key={hour}
-                  variant={selectedHour === hour ? "default" : "outline"}
-                  className={cn(
-                    "h-9 px-2 text-xs",
-                    selectedHour === hour 
-                      ? "bg-primary text-primary-foreground" 
-                      : "hover:bg-secondary/80"
-                  )}
-                  onClick={() => setSelectedHour(selectedHour === hour ? null : hour)}
-                >
-                  {hour}:00
-                </Button>
-              ))}
+              {hours.map((hour) => {
+                const hourNumber = parseInt(hour, 10);
+                const disabled = isHourDisabled(hourNumber);
+                
+                return (
+                  <Button
+                    key={hour}
+                    variant={selectedHour === hour ? "default" : "outline"}
+                    className={cn(
+                      "h-9 px-2 text-xs",
+                      selectedHour === hour 
+                        ? "bg-primary text-primary-foreground" 
+                        : "hover:bg-secondary/80",
+                      disabled && "opacity-50 cursor-not-allowed"
+                    )}
+                    onClick={() => !disabled && setSelectedHour(selectedHour === hour ? null : hour)}
+                    disabled={disabled}
+                  >
+                    {hour}:00
+                  </Button>
+                );
+              })}
             </div>
           </div>
           
