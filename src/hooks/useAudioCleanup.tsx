@@ -11,17 +11,21 @@ export const useAudioCleanup = (
   sourceNodeRef: MutableRefObject<AudioBufferSourceNode | null>
 ) => {
   const cleanup = useCallback(() => {
+    // Cancel any ongoing animation frame
     if (animationRef.current) {
+      console.log("Canceling animation frame:", animationRef.current);
       cancelAnimationFrame(animationRef.current);
       animationRef.current = null;
     }
     
+    // Clean up audio source node if it exists
     if (sourceNodeRef.current) {
+      console.log("Cleaning up source node");
       try {
-        // Check if the source node is currently playing
-        sourceNodeRef.current.onended = null; // Remove ended handler to prevent errors
+        // Remove ended handler to prevent errors
+        sourceNodeRef.current.onended = null;
         
-        // Only stop if not already stopped and if the context is in a valid state
+        // Only stop if the context is in a valid state
         const state = sourceNodeRef.current.context.state;
         if (state !== 'closed') {
           try {

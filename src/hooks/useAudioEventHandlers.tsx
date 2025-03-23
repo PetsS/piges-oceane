@@ -33,6 +33,11 @@ export const useAudioEventHandlers = ({
     const audio = audioRef.current;
     
     const setAudioData = () => {
+      if (!audio.duration || !isFinite(audio.duration)) {
+        console.warn("Audio duration is invalid:", audio.duration);
+        return;
+      }
+      
       console.log("Audio loaded successfully, duration:", audio.duration);
       setDuration(audio.duration);
       initializeMarkers(audio.duration);
@@ -50,7 +55,7 @@ export const useAudioEventHandlers = ({
     };
     
     const onError = (e: Event) => {
-      console.error('Error loading audio:', e);
+      console.error('Error loading audio:', e, audio.error);
       setIsBuffering(false);
       
       toast.error('Impossible de charger le fichier audio. Un fichier test sera utilisé à la place.');
@@ -62,23 +67,51 @@ export const useAudioEventHandlers = ({
     
     // Add buffering event listeners for large files
     const onWaiting = () => {
+      console.log("Audio waiting/buffering");
       setIsBuffering(true);
     };
     
     const onCanPlay = () => {
+      console.log("Audio can play now");
       setIsBuffering(false);
     };
     
+    const onPlay = () => {
+      console.log("Audio play event triggered");
+    };
+    
+    const onCanPlayThrough = () => {
+      console.log("Audio canplaythrough event - enough data is loaded to play without interruption");
+      setIsBuffering(false);
+    };
+    
+    // Remove existing event listeners (in case this function is called multiple times)
+    audio.removeEventListener('loadeddata', setAudioData);
+    audio.removeEventListener('loadedmetadata', setAudioData);
+    audio.removeEventListener('timeupdate', setAudioTime);
+    audio.removeEventListener('ended', onEnded);
+    audio.removeEventListener('error', onError);
+    audio.removeEventListener('waiting', onWaiting);
+    audio.removeEventListener('canplay', onCanPlay);
+    audio.removeEventListener('play', onPlay);
+    audio.removeEventListener('canplaythrough', onCanPlayThrough);
+    
+    // Add event listeners
     audio.addEventListener('loadeddata', setAudioData);
-    audio.addEventListener('loadedmetadata', setAudioData); // Also listen for metadata loaded
+    audio.addEventListener('loadedmetadata', setAudioData);
     audio.addEventListener('timeupdate', setAudioTime);
     audio.addEventListener('ended', onEnded);
     audio.addEventListener('error', onError);
     audio.addEventListener('waiting', onWaiting);
     audio.addEventListener('canplay', onCanPlay);
+    audio.addEventListener('play', onPlay);
+    audio.addEventListener('canplaythrough', onCanPlayThrough);
     
     // Show buffering state while loading
     setIsBuffering(true);
+    
+    // Manually trigger a load to ensure metadata loads
+    audio.load();
     
     const loadBuffer = async () => {
       setAudioBuffer(null);
@@ -89,31 +122,14 @@ export const useAudioEventHandlers = ({
         // For blob URLs, try to fetch and decode the audio data
         if (audioSrc.startsWith('blob:')) {
           console.log("Loading buffer for blob URL:", audioSrc);
-          fetch(audioSrc)
-            .then(response => {
-              if (!response.ok) {
-                throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
-              }
-              return response.arrayBuffer();
-            })
-            .then(async arrayBuffer => {
-              console.log("Blob URL fetched successfully, buffer size:", arrayBuffer.byteLength);
-              try {
-                const buffer = await fetchAndDecodeAudio(audioSrc);
-                if (buffer) {
-                  console.log("Successfully decoded blob audio buffer");
-                  setAudioBuffer(buffer);
-                }
-              } catch (decodeError) {
-                console.error("Error decoding audio data:", decodeError);
-              }
-            })
-            .catch(fetchError => {
-              console.error("Error fetching blob URL:", fetchError);
-            })
-            .finally(() => {
-              setIsBuffering(false);
-            });
+          
+          const buffer = await fetchAndDecodeAudio(audioSrc);
+          if (buffer) {
+            console.log("Successfully decoded blob audio buffer, duration:", buffer.duration);
+            setAudioBuffer(buffer);
+          } else {
+            console.warn("Failed to decode audio buffer from blob URL");
+          }
         } else {
           // For other sources, use the existing logic
           const buffer = await fetchAndDecodeAudio(audioSrc);
@@ -121,10 +137,10 @@ export const useAudioEventHandlers = ({
             setAudioBuffer(buffer);
             console.log("Audio buffer loaded successfully");
           }
-          setIsBuffering(false);
         }
       } catch (error) {
         console.error('Error loading audio buffer:', error);
+      } finally {
         setIsBuffering(false);
       }
     };
@@ -140,6 +156,8 @@ export const useAudioEventHandlers = ({
       audio.removeEventListener('error', onError);
       audio.removeEventListener('waiting', onWaiting);
       audio.removeEventListener('canplay', onCanPlay);
+      audio.removeEventListener('play', onPlay);
+      audio.removeEventListener('canplaythrough', onCanPlayThrough);
       clearTimeout(bufferTimeout);
     };
   }, [audioRef, setDuration, setCurrentTime, setIsPlaying, setIsBuffering, cleanup, initializeMarkers, fetchAndDecodeAudio, setAudioBuffer]);

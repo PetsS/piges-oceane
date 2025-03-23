@@ -6,6 +6,16 @@ export const useAudioBufferDecoder = (getAudioContext: () => AudioContext | null
     try {
       console.log("Fetching audio from URL:", url);
       
+      const audioContext = getAudioContext();
+      if (!audioContext) {
+        throw new Error("Failed to create AudioContext");
+      }
+      
+      // Resume the audio context if suspended (needed for Chrome's autoplay policy)
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
+      }
+      
       // For local files (blob URLs)
       if (url.startsWith('blob:')) {
         console.log("Processing local blob URL:", url);
@@ -20,11 +30,6 @@ export const useAudioBufferDecoder = (getAudioContext: () => AudioContext | null
           const arrayBuffer = await response.arrayBuffer();
           console.log("Blob URL fetched successfully, buffer size:", arrayBuffer.byteLength);
           
-          const audioContext = getAudioContext();
-          if (!audioContext) {
-            throw new Error("Failed to create AudioContext");
-          }
-          
           try {
             // Decode the audio data
             const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
@@ -32,20 +37,7 @@ export const useAudioBufferDecoder = (getAudioContext: () => AudioContext | null
             return audioBuffer;
           } catch (decodeError) {
             console.error("Error decoding audio data:", decodeError);
-            
-            // Create a fallback buffer with the correct duration (1 hour)
-            const buffer = audioContext.createBuffer(2, 3600 * audioContext.sampleRate, audioContext.sampleRate);
-            for (let channel = 0; channel < 2; channel++) {
-              const data = buffer.getChannelData(channel);
-              // Fill with minimal data for visualization
-              for (let i = 0; i < data.length; i += 1000) {
-                const sampleValue = Math.sin(i * 0.0001) * 0.5;
-                for (let j = 0; j < 1000 && i + j < data.length; j++) {
-                  data[i + j] = sampleValue;
-                }
-              }
-            }
-            return buffer;
+            throw decodeError;
           }
         } catch (fetchError) {
           console.error("Error fetching blob URL:", fetchError);
@@ -54,11 +46,7 @@ export const useAudioBufferDecoder = (getAudioContext: () => AudioContext | null
       }
       
       // Create default fallback buffer for non-blob URLs
-      const audioContext = getAudioContext();
-      if (!audioContext) {
-        throw new Error("Failed to create AudioContext");
-      }
-      
+      console.log("Creating fallback buffer for non-blob URL");
       const buffer = audioContext.createBuffer(2, 3600 * audioContext.sampleRate, audioContext.sampleRate);
       
       for (let channel = 0; channel < 2; channel++) {

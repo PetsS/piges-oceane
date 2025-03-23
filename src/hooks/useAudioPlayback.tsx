@@ -51,7 +51,10 @@ export const useAudioPlayback = () => {
   });
 
   const togglePlay = useCallback(() => {
-    if (!audioRef.current) return;
+    if (!audioRef.current) {
+      console.log("No audio element available");
+      return;
+    }
     
     if (!isPlaying) {
       console.log("Attempting to play audio", audioRef.current.src);
@@ -60,6 +63,12 @@ export const useAudioPlayback = () => {
       if (audioRef.current.src) {
         // Add buffering indicator
         setIsBuffering(true);
+        
+        // Ensure the audio context is running (needed for Chrome's autoplay policy)
+        const ctx = getAudioContext();
+        if (ctx && ctx.state === 'suspended') {
+          ctx.resume().catch(console.error);
+        }
         
         audioRef.current.play()
           .then(() => {
@@ -86,7 +95,7 @@ export const useAudioPlayback = () => {
         animationRef.current = null;
       }
     }
-  }, [isPlaying, animateTime]);
+  }, [isPlaying, animateTime, getAudioContext]);
 
   const seek = useCallback((time: number) => {
     if (!audioRef.current) return;
@@ -148,23 +157,29 @@ export const useAudioPlayback = () => {
     // Create a new audio element if needed
     if (!audioRef.current) {
       const audio = new Audio();
-      // Configure for efficient playback of large files
-      audio.preload = "metadata"; // Only preload metadata initially
       audioRef.current = audio;
-    } else {
-      // Reset existing audio element
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      audioRef.current.src = '';
+    }
+    
+    // Reset existing audio element
+    audioRef.current.pause();
+    audioRef.current.currentTime = 0;
+    
+    // Make sure we don't have an old src before setting a new one
+    if (audioRef.current.src) {
+      audioRef.current.removeAttribute('src');
+      audioRef.current.load();
     }
     
     console.log("Setting audio source to:", audioSrc);
     
+    // Configure for efficient playback of large files - AFTER removing previous src
+    audioRef.current.preload = "metadata"; // Only preload metadata initially
+    audioRef.current.crossOrigin = "anonymous"; // Add this to handle CORS
+    audioRef.current.volume = volume;
+    
     // Ensure we have a valid audio source
     if (audioSrc && audioSrc !== 'synthetic-audio') {
       audioRef.current.src = audioSrc;
-      audioRef.current.volume = volume;
-      audioRef.current.crossOrigin = "anonymous"; // Add this to handle CORS
       
       // Set up audio event handlers
       const cleanupEvents = setupAudioEvents(audioSrc);
@@ -175,7 +190,8 @@ export const useAudioPlayback = () => {
         
         if (audioRef.current?.src) {
           audioRef.current.pause();
-          audioRef.current.src = '';
+          audioRef.current.removeAttribute('src');
+          audioRef.current.load();
         }
         
         setIsBuffering(false);
@@ -193,7 +209,10 @@ export const useAudioPlayback = () => {
       
       if (audioRef.current) {
         audioRef.current.pause();
-        audioRef.current.src = '';
+        if (audioRef.current.src) {
+          audioRef.current.removeAttribute('src');
+          audioRef.current.load();
+        }
         audioRef.current = null;
       }
       
