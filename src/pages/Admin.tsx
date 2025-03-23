@@ -33,8 +33,6 @@ interface CityFolder {
   folderName: string;
 }
 
-export type ExportFormat = "wav" | "mp3-128k" | "mp3-256k" | "mp3-320k";
-
 interface Settings {
   headerTitle: string;
   buttonColors: {
@@ -44,7 +42,6 @@ interface Settings {
   };
   audioFolderPath: string;
   cities: string[] | CityFolder[];
-  exportFormat: ExportFormat;
 }
 
 const Admin = () => {
@@ -64,8 +61,7 @@ const Admin = () => {
       { displayName: "Lyon", folderName: "lyon" },
       { displayName: "Marseille", folderName: "marseille" },
       { displayName: "Bordeaux", folderName: "bordeaux" }
-    ],
-    exportFormat: "wav"
+    ]
   });
   
   const [newCityDisplayName, setNewCityDisplayName] = useState("");
@@ -130,11 +126,7 @@ const Admin = () => {
         } else {
           parsedSettings.cities = migrateOldCityFormat(parsedSettings.cities);
         }
-        
-        if (!parsedSettings.exportFormat) {
-          parsedSettings.exportFormat = "wav";
-        }
-        
+                
         setSettings(parsedSettings);
       } catch (error) {
         console.error("Error parsing settings from localStorage:", error);
@@ -394,13 +386,12 @@ const Admin = () => {
       </div>
       
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="users">Utilisateurs</TabsTrigger>
           <TabsTrigger value="headers">Titres et En-têtes</TabsTrigger>
           <TabsTrigger value="colors">Couleurs</TabsTrigger>
           <TabsTrigger value="folders">Dossiers Audio</TabsTrigger>
           <TabsTrigger value="cities">Villes</TabsTrigger>
-          <TabsTrigger value="export">Export</TabsTrigger>
         </TabsList>
         
         <TabsContent value="users" className="space-y-4 mt-6">
@@ -862,51 +853,10 @@ const Admin = () => {
             </CardContent>
           </Card>
         </TabsContent>
-        
-        <TabsContent value="export" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Paramètres d'export</CardTitle>
-              <CardDescription>
-                Configurez le format des fichiers audio exportés
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="exportFormat">Format d'export</Label>
-                  <Select
-                    value={settings.exportFormat}
-                    onValueChange={(value: ExportFormat) => 
-                      setSettings({...settings, exportFormat: value})
-                    }
-                  >
-                    <SelectTrigger id="exportFormat" className="w-full">
-                      <SelectValue placeholder="Sélectionner un format" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="wav">WAV (sans perte)</SelectItem>
-                      <SelectItem value="mp3-128k">MP3 (128 kbps)</SelectItem>
-                      <SelectItem value="mp3-256k">MP3 (256 kbps)</SelectItem>
-                      <SelectItem value="mp3-320k">MP3 (320 kbps)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Le format WAV offre une qualité sans perte mais des fichiers plus volumineux.
-                    Les formats MP3 sont plus légers mais avec une légère perte de qualité.
-                  </p>
-                </div>
-                
-                <div className="pt-2">
-                  <Button onClick={handleSaveSettings}>Enregistrer les paramètres</Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
     </div>
   );
 };
 
 export default Admin;
+

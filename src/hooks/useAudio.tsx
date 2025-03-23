@@ -1,7 +1,7 @@
+
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import type { ExportFormat } from '@/pages/Admin';
 import lamejs from 'lamejs';
 
 export interface AudioMarker {
@@ -29,7 +29,6 @@ export const useAudio = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [currentAudioFile, setCurrentAudioFile] = useState<AudioFile | null>(null);
   const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
-  const [exportFormat, setExportFormat] = useState<ExportFormat>("wav");
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -95,9 +94,6 @@ export const useAudio = () => {
         const settings = JSON.parse(savedSettings);
         if (settings.audioFolderPath) {
           audioFolderPath = settings.audioFolderPath;
-        }
-        if (settings.exportFormat) {
-          setExportFormat(settings.exportFormat);
         }
       } catch (error) {
         console.error("Error parsing settings:", error);
@@ -269,6 +265,19 @@ export const useAudio = () => {
     setVolume(newVolume);
   }, []);
 
+  const formatTime = useCallback((time: number) => {
+    const minutes = Math.floor(time / 60);
+    const seconds = Math.floor(time % 60);
+    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  }, []);
+
+  const formatTimeDetailed = useCallback((time: number) => {
+    const minutes = Math.floor(time / 60);
+    const seconds = Math.floor(time % 60);
+    const milliseconds = Math.floor((time % 1) * 1000);
+    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(3, '0')}`;
+  }, []);
+
   const addMarker = useCallback((type: 'start' | 'end') => {
     const filteredMarkers = markers.filter(marker => marker.type !== type);
     
@@ -281,14 +290,69 @@ export const useAudio = () => {
     setMarkers([...filteredMarkers, newMarker]);
     
     toast.success(`Marqueur ${type === 'start' ? 'début' : 'fin'} défini à ${formatTime(currentTime)}`);
-  }, [markers, currentTime]);
+  }, [markers, currentTime, formatTime]);
 
   const removeMarker = useCallback((id: string) => {
     setMarkers(markers.filter(marker => marker.id !== id));
   }, [markers]);
 
+  // The bufferToWav function (more memory efficient)
+  const bufferToWav = useCallback((buffer: AudioBuffer): Promise<Blob> => {
+    return new Promise((resolve) => {
+      const numOfChannels = Math.min(buffer.numberOfChannels, 2); // Limit to stereo to save memory
+      const length = buffer.length * numOfChannels * 2;
+      const sampleRate = buffer.sampleRate;
+      
+      const wavBuffer = new ArrayBuffer(44 + length);
+      const view = new DataView(wavBuffer);
+      
+      const writeString = (view: DataView, offset: number, string: string) => {
+        for (let i = 0; i < string.length; i++) {
+          view.setUint8(offset + i, string.charCodeAt(i));
+        }
+      };
+      
+      writeString(view, 0, 'RIFF');
+      view.setUint32(4, 36 + length, true);
+      writeString(view, 8, 'WAVE');
+      writeString(view, 12, 'fmt ');
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, numOfChannels, true);
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, sampleRate * numOfChannels * 2, true);
+      view.setUint16(32, numOfChannels * 2, true);
+      view.setUint16(34, 16, true);
+      writeString(view, 36, 'data');
+      view.setUint32(40, length, true);
+      
+      const offset = 44;
+      let pos = offset;
+      
+      // Process in smaller chunks to reduce memory pressure
+      const chunkSize = 10000; // Number of samples to process at once
+      
+      for (let i = 0; i < buffer.length; i += chunkSize) {
+        const blockSize = Math.min(chunkSize, buffer.length - i);
+        
+        // For each chunk, process all channels
+        for (let j = 0; j < blockSize; j++) {
+          for (let channel = 0; channel < numOfChannels; channel++) {
+            const sample = buffer.getChannelData(channel)[i + j];
+            const int = Math.max(-1, Math.min(1, sample)) * 0x7FFF;
+            view.setInt16(pos, int, true);
+            pos += 2;
+          }
+        }
+      }
+      
+      const blob = new Blob([wavBuffer], { type: 'audio/wav' });
+      resolve(blob);
+    });
+  }, []);
+
   // Memory-optimized MP3 encoding function
-  const bufferToMp3 = useCallback((buffer: AudioBuffer, bitrate = 128): Promise<Blob> => {
+  const bufferToMp3 = useCallback((buffer: AudioBuffer, bitrate = 192): Promise<Blob> => {
     return new Promise((resolve, reject) => {
       try {
         const sampleRate = buffer.sampleRate;
@@ -488,42 +552,18 @@ export const useAudio = () => {
         }
       }
       
-      // Get the export format - default to MP3 128kbps
-      const savedSettings = localStorage.getItem("appSettings");
-      let currentExportFormat: ExportFormat = "mp3-128";
-      
-      if (savedSettings) {
-        try {
-          const settings = JSON.parse(savedSettings);
-          if (settings.exportFormat) {
-            currentExportFormat = settings.exportFormat;
-          }
-        } catch (error) {
-          console.error("Error parsing settings:", error);
-        }
-      }
-      
-      setExportFormat(currentExportFormat);
-      
       let trimmedAudioBlob: Blob;
-      let fileExtension: string;
+      let fileExtension: string = "mp3";
+      const bitrate = 192;
       
-      // Default to MP3 export with fallback to WAV
+      // Use MP3 192k export with fallback to WAV
       try {
-        if (currentExportFormat === "wav") {
-          trimmedAudioBlob = await bufferToWav(trimmedBuffer);
-          fileExtension = "wav";
-        } else {
-          const bitrate = parseInt(currentExportFormat.split('-')[1]);
-          trimmedAudioBlob = await bufferToMp3(trimmedBuffer, bitrate);
-          fileExtension = "mp3";
-        }
+        trimmedAudioBlob = await bufferToMp3(trimmedBuffer, bitrate);
       } catch (error) {
-        console.error("Error in audio encoding:", error);
-        toast.error("Erreur lors de l'encodage. Export en WAV à la place.");
+        console.error("Error in MP3 encoding:", error);
+        toast.error("Erreur lors de l'encodage MP3. Export en WAV à la place.");
         trimmedAudioBlob = await bufferToWav(trimmedBuffer);
         fileExtension = "wav";
-        currentExportFormat = "wav";
       }
       
       const originalName = currentAudioFile.name.replace(/\.[^/.]+$/, "");
@@ -532,7 +572,7 @@ export const useAudio = () => {
       const downloadUrl = URL.createObjectURL(trimmedAudioBlob);
       
       toast.success(`Export prêt: ${exportFileName}`, {
-        description: `Découpé de ${formatTime(startTime)} à ${formatTime(endTime)} (${fileExtension === "mp3" ? currentExportFormat : "wav"})`,
+        description: `Découpé de ${formatTime(startTime)} à ${formatTime(endTime)} (${fileExtension === "mp3" ? `MP3 ${bitrate}kbps` : "WAV"})`,
         action: {
           label: 'Télécharger',
           onClick: () => {
@@ -554,62 +594,7 @@ export const useAudio = () => {
     } finally {
       processingRef.current = false;
     }
-  }, [audioBuffer, audioSrc, currentAudioFile, duration, bufferToWav, fetchAndDecodeAudio, formatTime, getAudioContext, markers]);
-
-  // The bufferToWav function (more memory efficient)
-  const bufferToWav = useCallback((buffer: AudioBuffer): Promise<Blob> => {
-    return new Promise((resolve) => {
-      const numOfChannels = Math.min(buffer.numberOfChannels, 2); // Limit to stereo to save memory
-      const length = buffer.length * numOfChannels * 2;
-      const sampleRate = buffer.sampleRate;
-      
-      const wavBuffer = new ArrayBuffer(44 + length);
-      const view = new DataView(wavBuffer);
-      
-      const writeString = (view: DataView, offset: number, string: string) => {
-        for (let i = 0; i < string.length; i++) {
-          view.setUint8(offset + i, string.charCodeAt(i));
-        }
-      };
-      
-      writeString(view, 0, 'RIFF');
-      view.setUint32(4, 36 + length, true);
-      writeString(view, 8, 'WAVE');
-      writeString(view, 12, 'fmt ');
-      view.setUint32(16, 16, true);
-      view.setUint16(20, 1, true);
-      view.setUint16(22, numOfChannels, true);
-      view.setUint32(24, sampleRate, true);
-      view.setUint32(28, sampleRate * numOfChannels * 2, true);
-      view.setUint16(32, numOfChannels * 2, true);
-      view.setUint16(34, 16, true);
-      writeString(view, 36, 'data');
-      view.setUint32(40, length, true);
-      
-      const offset = 44;
-      let pos = offset;
-      
-      // Process in smaller chunks to reduce memory pressure
-      const chunkSize = 10000; // Number of samples to process at once
-      
-      for (let i = 0; i < buffer.length; i += chunkSize) {
-        const blockSize = Math.min(chunkSize, buffer.length - i);
-        
-        // For each chunk, process all channels
-        for (let j = 0; j < blockSize; j++) {
-          for (let channel = 0; channel < numOfChannels; channel++) {
-            const sample = buffer.getChannelData(channel)[i + j];
-            const int = Math.max(-1, Math.min(1, sample)) * 0x7FFF;
-            view.setInt16(pos, int, true);
-            pos += 2;
-          }
-        }
-      }
-      
-      const blob = new Blob([wavBuffer], { type: 'audio/wav' });
-      resolve(blob);
-    });
-  }, []);
+  }, [audioBuffer, audioSrc, currentAudioFile, duration, markers, formatTime, getAudioContext, fetchAndDecodeAudio, bufferToMp3, bufferToWav]);
 
   const loadAudioFile = useCallback((file: AudioFile) => {
     setIsLoading(true);
@@ -644,19 +629,6 @@ export const useAudio = () => {
     }
   }, [audioSrc]);
 
-  const formatTime = useCallback((time: number) => {
-    const minutes = Math.floor(time / 60);
-    const seconds = Math.floor(time % 60);
-    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-  }, []);
-
-  const formatTimeDetailed = useCallback((time: number) => {
-    const minutes = Math.floor(time / 60);
-    const seconds = Math.floor(time % 60);
-    const milliseconds = Math.floor((time % 1) * 1000);
-    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(3, '0')}`;
-  }, []);
-
   // Clean up resources when component unmounts
   useEffect(() => {
     return () => {
@@ -690,7 +662,6 @@ export const useAudio = () => {
     audioFiles,
     isLoading,
     currentAudioFile,
-    exportFormat,
     togglePlay,
     seek,
     changeVolume,
@@ -703,3 +674,4 @@ export const useAudio = () => {
     formatTimeDetailed
   };
 };
+

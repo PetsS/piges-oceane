@@ -16,7 +16,6 @@ interface AudioExporterProps {
   isExporting: boolean;
   formatTimeDetailed: (time: number) => string;
   canExport: boolean;
-  exportFormat?: string;
 }
 
 export const AudioExporter = ({
@@ -25,7 +24,6 @@ export const AudioExporter = ({
   isExporting,
   formatTimeDetailed,
   canExport,
-  exportFormat = "mp3-128",
 }: AudioExporterProps) => {
   const startMarker = markers.find((marker) => marker.type === "start");
   const endMarker = markers.find((marker) => marker.type === "end");
@@ -44,7 +42,7 @@ export const AudioExporter = ({
           </div>
           <div>
             <Badge variant="outline" className="text-xs">
-              {exportFormat === "wav" ? "WAV" : `MP3 ${exportFormat.split('-')[1]}kbps`}
+              MP3 192kbps
             </Badge>
           </div>
         </div>
@@ -73,7 +71,7 @@ export const AudioExporter = ({
             <p>
               {!canExport
                 ? "Définissez les marqueurs de début et de fin"
-                : `Découper et exporter la section audio sélectionnée (${exportFormat === "wav" ? "WAV" : `MP3 ${exportFormat.split('-')[1]}kbps`})`}
+                : "Découper et exporter la section audio sélectionnée (MP3 192kbps)"}
             </p>
           </TooltipContent>
         </Tooltip>
