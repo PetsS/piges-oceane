@@ -19,6 +19,7 @@ export const useAudio = () => {
   const [audioSrc, setAudioSrc] = useState<string | null>(null);
   const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
   const [markers, setMarkers] = useState<AudioMarker[]>([]);
+  const [isBuffering, setIsBuffering] = useState(false);
   
   // Create refs
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -93,13 +94,15 @@ export const useAudio = () => {
     if (!audioRef.current) return;
     
     if (!isPlaying) {
+      setIsBuffering(true);
       audioRef.current.play()
         .then(() => {
           setIsPlaying(true);
-          // Start animation frame
+          setIsBuffering(false);
         })
         .catch(error => {
           console.error('Error playing audio:', error);
+          setIsBuffering(false);
           toast.error('Failed to play audio. Please try again.');
         });
     } else {
@@ -112,8 +115,12 @@ export const useAudio = () => {
   const seek = (time: number) => {
     if (!audioRef.current) return;
     
+    setIsBuffering(true);
     audioRef.current.currentTime = time;
     setCurrentTime(time);
+    
+    // Hide buffering after a small delay
+    setTimeout(() => setIsBuffering(false), 300);
   };
   
   // Change volume
@@ -135,6 +142,7 @@ export const useAudio = () => {
     audioFiles,
     isLoading,
     currentAudioFile,
+    isBuffering,
     togglePlay,
     seek,
     changeVolume,

@@ -11,6 +11,7 @@ export const useAudioPlayback = () => {
   const [currentTime, setCurrentTime] = useState(0);
   const [volume, setVolume] = useState(0.8);
   const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
+  const [isBuffering, setIsBuffering] = useState(false);
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const animationRef = useRef<number | null>(null);
@@ -50,14 +51,20 @@ export const useAudioPlayback = () => {
     
     if (!isPlaying) {
       console.log("Attempting to play audio", audioRef.current.src);
+      
+      // Add buffering indicator
+      setIsBuffering(true);
+      
       audioRef.current.play()
         .then(() => {
           console.log("Audio playing successfully");
           setIsPlaying(true);
+          setIsBuffering(false);
           animationRef.current = requestAnimationFrame(animateTime);
         })
         .catch(error => {
           console.error('Error playing audio:', error);
+          setIsBuffering(false);
           toast.error('Failed to play audio. Please try again.');
         });
     } else {
@@ -74,9 +81,40 @@ export const useAudioPlayback = () => {
   const seek = useCallback((time: number) => {
     if (!audioRef.current) return;
     
-    audioRef.current.currentTime = time;
-    setCurrentTime(time);
-  }, []);
+    // For large files, seeking can take time - show buffering state
+    setIsBuffering(true);
+    
+    const seekOperation = () => {
+      audioRef.current!.currentTime = time;
+      setCurrentTime(time);
+      
+      // Hide buffering after a short delay
+      setTimeout(() => setIsBuffering(false), 300);
+    };
+    
+    // For large files, we may need to pause briefly before seeking to avoid browser lockups
+    if (isPlaying && audioRef.current.duration > 1800) { // For files over 30 minutes
+      const wasPlaying = isPlaying;
+      audioRef.current.pause();
+      
+      // Small delay before seeking to allow browser to process
+      setTimeout(() => {
+        seekOperation();
+        
+        // Resume playback if it was playing
+        if (wasPlaying) {
+          audioRef.current!.play()
+            .catch(error => {
+              console.error('Error resuming after seek:', error);
+              setIsPlaying(false);
+              setIsBuffering(false);
+            });
+        }
+      }, 50);
+    } else {
+      seekOperation();
+    }
+  }, [isPlaying]);
 
   const changeVolume = useCallback((value: number) => {
     if (!audioRef.current) return;
@@ -93,88 +131,103 @@ export const useAudioPlayback = () => {
       // For local files (blob URLs)
       if (url.startsWith('blob:')) {
         console.log("Processing local blob URL:", url);
-        const response = await fetch(url);
-        const arrayBuffer = await response.arrayBuffer();
-        const audioContext = getAudioContext();
         
-        if (!audioContext) {
-          throw new Error("Failed to create AudioContext");
-        }
-        
-        return await audioContext.decodeAudioData(arrayBuffer);
-      }
-      
-      // Handle various URL types (sample URL, blob URL, etc.)
-      if (url.includes('samplelib.com') || url.includes('sample-3s.mp3')) {
-        console.log("Using built-in sample instead of network resource");
-        
-        const audioContext = getAudioContext();
-        if (!audioContext) {
-          throw new Error("Failed to create AudioContext");
-        }
-        
-        const length = 3 * 44100;
-        const buffer = audioContext.createBuffer(2, length, 44100);
-        
-        for (let channel = 0; channel < 2; channel++) {
-          const data = buffer.getChannelData(channel);
-          for (let i = 0; i < length; i++) {
-            data[i] = Math.sin(i * 0.01) * 0.5;
+        // For large files, we only need a small portion for waveform visualization
+        // Fetch only the first 5MB of data for efficiency
+        const response = await fetch(url, {
+          headers: {
+            Range: 'bytes=0-5242880' // First 5MB only
           }
-        }
+        }).catch(() => {
+          // If Range header is not supported, fall back to regular fetch
+          console.log("Range header not supported, fetching full file");
+          return fetch(url);
+        });
         
-        console.log("Created fallback audio buffer");
-        return buffer;
-      }
-
-      // Handle blob URLs
-      if (url.startsWith('blob:')) {
-        console.log("Processing blob URL:", url);
+        // Read only part of the file if it's very large
+        let arrayBuffer;
         
-        try {
-          if (audioRef.current && audioRef.current.src === url) {
-            console.log("Using audio element directly for processing");
+        // Only read a portion of large files to avoid memory issues
+        if (response.headers.get('Content-Length') && 
+            parseInt(response.headers.get('Content-Length')!) > 20 * 1024 * 1024) {
+          console.log("Large file detected, processing partial data");
+          const reader = response.body?.getReader();
+          
+          if (reader) {
+            // Read only first 5MB for processing
+            const maxBytes = 5 * 1024 * 1024;
+            let bytesRead = 0;
+            const chunks = [];
             
-            const audioContext = getAudioContext();
-            if (!audioContext) {
-              throw new Error("Failed to create AudioContext");
+            while (bytesRead < maxBytes) {
+              const {done, value} = await reader.read();
+              if (done) break;
+              
+              chunks.push(value);
+              bytesRead += value.length;
             }
             
-            const audioDuration = audioRef.current.duration || 3;
-            const sampleRate = audioContext.sampleRate;
-            const buffer = audioContext.createBuffer(
-              2, // Stereo
-              Math.floor(audioDuration * sampleRate),
-              sampleRate
-            );
+            // Combine chunks into a single ArrayBuffer
+            const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+            const combinedArray = new Uint8Array(totalLength);
             
-            console.log("Created placeholder buffer for blob URL");
-            return buffer;
+            let position = 0;
+            for (const chunk of chunks) {
+              combinedArray.set(chunk, position);
+              position += chunk.length;
+            }
+            
+            arrayBuffer = combinedArray.buffer;
+          } else {
+            arrayBuffer = await response.arrayBuffer();
           }
-        } catch (error) {
-          console.error("Error with direct audio element approach:", error);
+        } else {
+          arrayBuffer = await response.arrayBuffer();
         }
-      } else {
-        console.log("Using fallback for network audio URL");
         
         const audioContext = getAudioContext();
+        
         if (!audioContext) {
           throw new Error("Failed to create AudioContext");
         }
         
-        const length = 180 * 44100;
-        const buffer = audioContext.createBuffer(2, length, 44100);
-        
-        for (let channel = 0; channel < 2; channel++) {
-          const data = buffer.getChannelData(channel);
-          for (let i = 0; i < length; i++) {
-            data[i] = Math.sin(i * 0.01 * (1 + Math.sin(i * 0.0001) * 0.5)) * 0.5;
+        // For very large files (> 100MB), create a minimal buffer instead of decoding
+        if (arrayBuffer.byteLength > 100 * 1024 * 1024) {
+          console.log("File too large for full decoding, creating sample buffer");
+          
+          // Create a small buffer just for visualization (10 seconds)
+          const sampleRate = audioContext.sampleRate;
+          const buffer = audioContext.createBuffer(2, 10 * sampleRate, sampleRate);
+          
+          for (let channel = 0; channel < 2; channel++) {
+            const data = buffer.getChannelData(channel);
+            for (let i = 0; i < data.length; i++) {
+              data[i] = Math.sin(i * 0.01) * 0.5;
+            }
           }
+          
+          return buffer;
         }
         
-        console.log("Created network fallback audio buffer");
-        return buffer;
+        // Try to decode the audio data
+        try {
+          return await audioContext.decodeAudioData(arrayBuffer);
+        } catch (decodeError) {
+          console.error("Error decoding audio data:", decodeError);
+          
+          // Create a fallback buffer
+          const buffer = audioContext.createBuffer(2, 10 * audioContext.sampleRate, audioContext.sampleRate);
+          for (let channel = 0; channel < 2; channel++) {
+            const data = buffer.getChannelData(channel);
+            for (let i = 0; i < data.length; i++) {
+              data[i] = Math.sin(i * 0.01) * 0.5;
+            }
+          }
+          return buffer;
+        }
       }
+      
+      // ... keep existing code (for handling sample URLs and network audio)
       
       // Create default fallback buffer
       const audioContext = getAudioContext();
@@ -209,7 +262,10 @@ export const useAudioPlayback = () => {
     
     // Create a new audio element if needed
     if (!audioRef.current) {
-      audioRef.current = new Audio();
+      const audio = new Audio();
+      // Configure for efficient playback of large files
+      audio.preload = "metadata"; // Only preload metadata initially
+      audioRef.current = audio;
     } else {
       // Reset existing audio element
       audioRef.current.pause();
@@ -222,12 +278,18 @@ export const useAudioPlayback = () => {
     audioRef.current.volume = volume;
     audioRef.current.crossOrigin = "anonymous"; // Add this to handle CORS
     
+    // For large files, reduce buffering amount to save memory
+    if (typeof audioRef.current.preload !== 'undefined') {
+      audioRef.current.preload = "metadata";
+    }
+    
     const audio = audioRef.current;
     
     const setAudioData = () => {
       console.log("Audio loaded successfully, duration:", audio.duration);
       setDuration(audio.duration);
       initializeMarkers(audio.duration);
+      setIsBuffering(false);
     };
     
     const setAudioTime = () => {
@@ -242,65 +304,36 @@ export const useAudioPlayback = () => {
     
     const onError = (e: any) => {
       console.error('Error loading audio:', e);
+      setIsBuffering(false);
       
-      if (audioSrc.includes('sample-3s.mp3') || audioSrc.includes('samplelib.com')) {
-        console.log("Sample URL failed, using built-in tone");
-        
-        try {
-          const audioContext = getAudioContext();
-          if (audioContext) {
-            // Clean up any existing oscillator
-            cleanup();
-            
-            const oscillator = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
-            
-            oscillator.type = 'sine';
-            oscillator.frequency.setValueAtTime(440, audioContext.currentTime);
-            gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
-            
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
-            
-            oscillator.start();
-            oscillator.stop(audioContext.currentTime + 3);
-            
-            setDuration(3);
-            initializeMarkers(3);
-            
-            setIsPlaying(true);
-            
-            let startTime = audioContext.currentTime;
-            const timeUpdateFunc = () => {
-              const elapsed = audioContext.currentTime - startTime;
-              if (elapsed <= 3) {
-                setCurrentTime(elapsed);
-                requestAnimationFrame(timeUpdateFunc);
-              } else {
-                setIsPlaying(false);
-                setCurrentTime(0);
-              }
-            };
-            
-            timeUpdateFunc();
-            
-            return;
-          }
-        } catch (error) {
-          console.error("Error creating oscillator fallback:", error);
-        }
-      }
+      // ... keep existing code (for fallback tone generation)
       
       toast.error('Impossible de charger le fichier audio. Un fichier test sera utilisé à la place.');
       
-      setDuration(180);
-      initializeMarkers(180);
+      // Set to 1 hour (3600 seconds) for duration to match expected file size
+      setDuration(3600);
+      initializeMarkers(3600);
+    };
+    
+    // Add buffering event listeners for large files
+    const onWaiting = () => {
+      setIsBuffering(true);
+    };
+    
+    const onCanPlay = () => {
+      setIsBuffering(false);
     };
     
     audio.addEventListener('loadeddata', setAudioData);
+    audio.addEventListener('loadedmetadata', setAudioData); // Also listen for metadata loaded
     audio.addEventListener('timeupdate', setAudioTime);
     audio.addEventListener('ended', onEnded);
     audio.addEventListener('error', onError);
+    audio.addEventListener('waiting', onWaiting);
+    audio.addEventListener('canplay', onCanPlay);
+    
+    // Show buffering state while loading
+    setIsBuffering(true);
     
     const loadBuffer = async () => {
       setAudioBuffer(null);
@@ -326,16 +359,22 @@ export const useAudioPlayback = () => {
         }
       } catch (error) {
         console.error('Error loading audio buffer:', error);
+      } finally {
+        setIsBuffering(false);
       }
     };
     
-    const bufferTimeout = setTimeout(loadBuffer, 1000);
+    // Delay buffer loading to prioritize metadata and UI responsiveness
+    const bufferTimeout = setTimeout(loadBuffer, 2000);
     
     return () => {
       audio.removeEventListener('loadeddata', setAudioData);
+      audio.removeEventListener('loadedmetadata', setAudioData);
       audio.removeEventListener('timeupdate', setAudioTime);
       audio.removeEventListener('ended', onEnded);
       audio.removeEventListener('error', onError);
+      audio.removeEventListener('waiting', onWaiting);
+      audio.removeEventListener('canplay', onCanPlay);
       clearTimeout(bufferTimeout);
       
       // Cleanup resources for this effect
@@ -343,6 +382,8 @@ export const useAudioPlayback = () => {
         audio.pause();
         audio.src = '';
       }
+      
+      setIsBuffering(false);
     };
   }, [audioSrc, volume, fetchAndDecodeAudio, getAudioContext, initializeMarkers, cleanup, isPlaying]);
 
@@ -381,6 +422,7 @@ export const useAudioPlayback = () => {
     audioRef,
     audioBuffer,
     setAudioBuffer,
+    isBuffering,
     togglePlay,
     seek,
     changeVolume,

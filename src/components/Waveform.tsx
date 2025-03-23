@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { AudioMarker } from "@/hooks/useAudio";
@@ -23,12 +22,13 @@ export const Waveform = ({
   const [hoverTime, setHoverTime] = useState<number | null>(null);
   
   // Generate random waveform data but only once when duration changes
-  // Reduced number of points from 100 to 50 to decrease memory usage
+  // For long files (1 hour), generate fewer points for better performance
   useEffect(() => {
     if (duration <= 0) return;
     
-    // Generate fewer data points to reduce memory consumption
-    const data = Array.from({ length: 50 }, () => Math.random() * 0.8 + 0.2);
+    // For long files (1 hour), reduce the number of data points further
+    const pointCount = duration > 1800 ? 30 : 50;
+    const data = Array.from({ length: pointCount }, () => Math.random() * 0.8 + 0.2);
     setWaveformData(data);
   }, [duration]);
   
@@ -129,8 +129,8 @@ export const Waveform = ({
           style={{ left: `${(currentTime / duration) * 100}%` }}
         />
         
-        {/* Simplified waveform visualization with fewer bars */}
-        <div className="flex items-end h-full w-full gap-[3px]">
+        {/* Simplified waveform visualization with fewer bars for better performance with 1-hour files */}
+        <div className="flex items-end h-full w-full gap-[4px]">
           {waveformData.map((value, index) => {
             const position = (index / waveformData.length) * duration;
             const isActive = position <= currentTime;
@@ -147,12 +147,9 @@ export const Waveform = ({
                   "waveform-bar flex-1",
                   isActive && "active",
                   isInMarkedRegion && "bg-primary/70",
-                  isPlaying && isActive && "animate-waveform"
+                  isPlaying && isActive && (index % 2 === 0) && "animate-waveform"
                 )}
-                style={{ 
-                  height,
-                  // Removed animation delay to reduce performance impact
-                }}
+                style={{ height }}
               />
             );
           })}

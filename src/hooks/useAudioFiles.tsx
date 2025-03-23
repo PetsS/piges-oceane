@@ -28,7 +28,7 @@ export const useAudioFiles = (
         const mockFile: AudioFile = {
           name: `${hour}.mp3`,
           path: `${path}\\${hour}.mp3`,
-          size: '58.2 MB',
+          size: '140 MB', // Updated to reflect 1-hour audio file size
           type: 'audio/mpeg',
           lastModified: format(date, 'yyyy-MM-dd')
         };
@@ -42,7 +42,7 @@ export const useAudioFiles = (
           return {
             name: `${hourStr}.mp3`,
             path: `${path}\\${hourStr}.mp3`,
-            size: `${Math.floor(50 + Math.random() * 10)}.${Math.floor(Math.random() * 10)}MB`,
+            size: `140 MB`, // Updated to consistently show 140MB for all files
             type: 'audio/mpeg',
             lastModified: format(date, 'yyyy-MM-dd')
           };
@@ -94,15 +94,16 @@ export const useAudioFiles = (
     
     // For local files or real URL paths (blob: or http)
     if (file.path.startsWith('blob:') || file.path.startsWith('http')) {
-      console.log("Loading local file:", file.name, file.path);
+      console.log("Loading large local file:", file.name, file.path);
       
       // Create a new audio element and set its source
       const audio = new Audio();
+      audio.preload = "metadata"; // Only load metadata initially to reduce memory usage
       audio.src = file.path;
       
       // Check if the audio can be played
-      audio.addEventListener('canplaythrough', () => {
-        console.log("Audio can play through:", file.name);
+      audio.addEventListener('loadedmetadata', () => {
+        console.log("Audio metadata loaded:", file.name, "Duration:", audio.duration);
         setAudioSrc(file.path);
         setIsPlaying(false);
         setCurrentTime(0);
@@ -123,7 +124,7 @@ export const useAudioFiles = (
         setIsLoading(false);
       }, { once: true });
       
-      // Force load the audio
+      // Force load the audio metadata
       audio.load();
     } else {
       console.log("Loading mock network file:", file.name);
@@ -137,17 +138,24 @@ export const useAudioFiles = (
             setCurrentTime(0);
             setIsLoading(false);
             
+            // Use 3600 seconds (1 hour) for duration to match file size
             const duration = 3600;
             
             initializeMarkers(duration);
             
-            const buffer = ctx.createBuffer(2, duration * ctx.sampleRate, ctx.sampleRate);
+            // Create a minimal buffer for visualization only, not loading the full hour
+            // of audio data into memory which would be inefficient
+            const buffer = ctx.createBuffer(2, Math.min(duration * ctx.sampleRate, 10 * ctx.sampleRate), ctx.sampleRate);
+            
+            // Only fill a small portion of the buffer with data for efficiency
             for (let channel = 0; channel < 2; channel++) {
               const data = buffer.getChannelData(channel);
-              for (let i = 0; i < data.length; i++) {
+              const sampleLength = Math.min(data.length, 10 * ctx.sampleRate);
+              for (let i = 0; i < sampleLength; i++) {
                 data[i] = Math.sin(i * 0.01 * (1 + Math.sin(i * 0.0001) * 0.5)) * 0.5;
               }
             }
+            
             setAudioBuffer(buffer);
             
             toast.info("Fichier audio réseau simulé chargé avec succès.");

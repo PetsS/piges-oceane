@@ -10,7 +10,8 @@ import {
   VolumeX,
   Music,
   ChevronsLeft,
-  ChevronsRight
+  ChevronsRight,
+  Loader2
 } from "lucide-react";
 
 interface AudioPlayerProps {
@@ -24,6 +25,7 @@ interface AudioPlayerProps {
   formatTime: (time: number) => string;
   audioTitle?: string;
   isLoading?: boolean;
+  isBuffering?: boolean;
 }
 
 // Use memo to prevent unnecessary re-renders
@@ -38,6 +40,7 @@ export const AudioPlayer = memo(({
   formatTime,
   audioTitle = "Aucun audio chargé",
   isLoading = false,
+  isBuffering = false,
 }: AudioPlayerProps) => {
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
   
@@ -128,7 +131,7 @@ export const AudioPlayer = memo(({
             size="icon"
             className="rounded-full h-10 w-10"
             onClick={handleSkipBack}
-            disabled={duration === 0 || isLoading}
+            disabled={duration === 0 || isLoading || isBuffering}
           >
             <ChevronsLeft className="h-5 w-5" />
           </Button>
@@ -140,7 +143,9 @@ export const AudioPlayer = memo(({
             onClick={onPlayPause}
             disabled={duration === 0 || isLoading}
           >
-            {isPlaying ? (
+            {isBuffering ? (
+              <Loader2 className="h-6 w-6 animate-spin" />
+            ) : isPlaying ? (
               <Pause className="h-6 w-6" />
             ) : (
               <Play className="h-6 w-6 ml-1" />
@@ -152,7 +157,7 @@ export const AudioPlayer = memo(({
             size="icon"
             className="rounded-full h-10 w-10"
             onClick={handleSkipForward}
-            disabled={duration === 0 || isLoading}
+            disabled={duration === 0 || isLoading || isBuffering}
           >
             <ChevronsRight className="h-5 w-5" />
           </Button>

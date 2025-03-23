@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { AudioPlayer } from "@/components/AudioPlayer";
@@ -85,6 +86,7 @@ const Index = () => {
     seek,
     changeVolume,
     currentAudioFile,
+    isBuffering,
   } = useAudio();
 
   useEffect(() => {
@@ -196,6 +198,7 @@ const Index = () => {
               formatTime={formatTime}
               audioTitle={currentAudioFile ? currentAudioFile.name : "Aucun audio chargé"}
               isLoading={isLoading}
+              isBuffering={isBuffering}
             />
           </div>
 
