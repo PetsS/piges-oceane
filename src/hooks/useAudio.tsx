@@ -1,7 +1,7 @@
-
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import type { ExportFormat } from '@/pages/Admin';
 
 export interface AudioMarker {
   id: string;
@@ -28,6 +28,7 @@ export const useAudio = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [currentAudioFile, setCurrentAudioFile] = useState<AudioFile | null>(null);
   const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
+  const [exportFormat, setExportFormat] = useState<ExportFormat>("wav");
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -84,6 +85,9 @@ export const useAudio = () => {
         if (settings.audioFolderPath) {
           audioFolderPath = settings.audioFolderPath;
         }
+        if (settings.exportFormat) {
+          setExportFormat(settings.exportFormat);
+        }
       } catch (error) {
         console.error("Error parsing settings:", error);
       }
@@ -92,7 +96,6 @@ export const useAudio = () => {
     loadFilesFromUNC(`${audioFolderPath}\\${defaultCity}\\${format(today, 'yyyy-MM-dd')}`, defaultCity, today, currentHour);
   }, [loadFilesFromUNC]);
 
-  // Initialize the AudioContext when needed
   const getAudioContext = () => {
     if (!audioContextRef.current) {
       audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -100,7 +103,6 @@ export const useAudio = () => {
     return audioContextRef.current;
   };
 
-  // Fetch and decode the audio file
   const fetchAndDecodeAudio = async (url: string): Promise<AudioBuffer> => {
     const response = await fetch(url);
     const arrayBuffer = await response.arrayBuffer();
@@ -156,7 +158,6 @@ export const useAudio = () => {
     
     audio.volume = volume;
     
-    // Load audio buffer for processing
     const loadBuffer = async () => {
       try {
         const buffer = await fetchAndDecodeAudio(audioSrc);
@@ -239,7 +240,6 @@ export const useAudio = () => {
     setMarkers(markers.filter(marker => marker.id !== id));
   };
 
-  // Create a trimmed audio file based on the markers
   const exportTrimmedAudio = async () => {
     if (!audioBuffer || !currentAudioFile) {
       toast.error('Aucun audio chargé');
@@ -267,37 +267,57 @@ export const useAudio = () => {
     try {
       const audioContext = getAudioContext();
       
-      // Calculate start and end in samples
       const sampleRate = audioBuffer.sampleRate;
       const startSample = Math.floor(startTime * sampleRate);
       const endSample = Math.min(Math.floor(endTime * sampleRate), audioBuffer.length);
       const frameCount = endSample - startSample;
       
-      // Create a new buffer for the trimmed segment
       const trimmedBuffer = audioContext.createBuffer(
         audioBuffer.numberOfChannels,
         frameCount,
         sampleRate
       );
       
-      // Copy the data from original buffer to trimmed buffer
       for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
         const channelData = new Float32Array(frameCount);
         audioBuffer.copyFromChannel(channelData, channel, startSample);
         trimmedBuffer.copyToChannel(channelData, channel);
       }
       
-      // Convert the buffer to WAV or MP3
-      const trimmedAudioBlob = await bufferToWav(trimmedBuffer);
+      const savedSettings = localStorage.getItem("appSettings");
+      let currentExportFormat = exportFormat;
+      
+      if (savedSettings) {
+        try {
+          const settings = JSON.parse(savedSettings);
+          if (settings.exportFormat) {
+            currentExportFormat = settings.exportFormat;
+          }
+        } catch (error) {
+          console.error("Error parsing settings:", error);
+        }
+      }
+      
+      let trimmedAudioBlob: Blob;
+      let fileExtension: string;
+      
+      if (currentExportFormat === "wav") {
+        trimmedAudioBlob = await bufferToWav(trimmedBuffer);
+        fileExtension = "wav";
+      } else {
+        trimmedAudioBlob = await bufferToWav(trimmedBuffer);
+        fileExtension = "wav";
+        
+        toast.info(`Note: L'export MP3 n'est pas implémenté dans cette version de démonstration. Le fichier a été exporté en WAV.`, { duration: 5000 });
+      }
       
       const originalName = currentAudioFile.name.replace(/\.[^/.]+$/, "");
-      const exportFileName = `${originalName}_${formatTime(startTime).replace(':', '')}-${formatTime(endTime).replace(':', '')}.wav`;
+      const exportFileName = `${originalName}_${formatTime(startTime).replace(':', '')}-${formatTime(endTime).replace(':', '')}.${fileExtension}`;
       
-      // Create a download URL
       const downloadUrl = URL.createObjectURL(trimmedAudioBlob);
       
       toast.success(`Export prêt: ${exportFileName}`, {
-        description: `Découpé de ${formatTime(startTime)} à ${formatTime(endTime)}`,
+        description: `Découpé de ${formatTime(startTime)} à ${formatTime(endTime)} (${currentExportFormat})`,
         action: {
           label: 'Télécharger',
           onClick: () => {
@@ -307,7 +327,6 @@ export const useAudio = () => {
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
-            // Clean up
             setTimeout(() => URL.revokeObjectURL(downloadUrl), 100);
           }
         },
@@ -319,52 +338,35 @@ export const useAudio = () => {
     }
   };
 
-  // Convert AudioBuffer to WAV file
   const bufferToWav = (buffer: AudioBuffer): Promise<Blob> => {
     return new Promise((resolve) => {
       const numOfChannels = buffer.numberOfChannels;
       const length = buffer.length * numOfChannels * 2;
       const sampleRate = buffer.sampleRate;
       
-      // Create the buffer to contain the WAV data
       const wavBuffer = new ArrayBuffer(44 + length);
       const view = new DataView(wavBuffer);
       
-      // RIFF identifier
       writeString(view, 0, 'RIFF');
-      // File length
       view.setUint32(4, 36 + length, true);
-      // RIFF type
       writeString(view, 8, 'WAVE');
-      // Format chunk identifier
       writeString(view, 12, 'fmt ');
-      // Format chunk length
       view.setUint32(16, 16, true);
-      // Sample format (raw)
       view.setUint16(20, 1, true);
-      // Channel count
       view.setUint16(22, numOfChannels, true);
-      // Sample rate
       view.setUint32(24, sampleRate, true);
-      // Byte rate (sample rate * block align)
       view.setUint32(28, sampleRate * numOfChannels * 2, true);
-      // Block align (channel count * bytes per sample)
       view.setUint16(32, numOfChannels * 2, true);
-      // Bits per sample
       view.setUint16(34, 16, true);
-      // Data chunk identifier
       writeString(view, 36, 'data');
-      // Data chunk length
       view.setUint32(40, length, true);
       
-      // Write the PCM samples
       const offset = 44;
       let pos = offset;
       
       for (let i = 0; i < buffer.length; i++) {
         for (let channel = 0; channel < numOfChannels; channel++) {
           const sample = buffer.getChannelData(channel)[i];
-          // Convert float audio data to 16-bit PCM
           const int = Math.max(-1, Math.min(1, sample)) * 0x7FFF;
           view.setInt16(pos, int, true);
           pos += 2;
@@ -375,8 +377,7 @@ export const useAudio = () => {
       resolve(blob);
     });
   };
-  
-  // Helper function to write a string to the DataView
+
   const writeString = (view: DataView, offset: number, string: string) => {
     for (let i = 0; i < string.length; i++) {
       view.setUint8(offset + i, string.charCodeAt(i));
