@@ -123,11 +123,15 @@ const Index = () => {
   const handleExport = async () => {
     try {
       setIsExporting(true);
+      console.log("Starting export process");
       await exportTrimmedAudio();
     } catch (error) {
       console.error("Export error:", error);
     } finally {
-      setIsExporting(false);
+      setTimeout(() => {
+        setIsExporting(false);
+        console.log("Export process completed");
+      }, 500);
     }
   };
 
