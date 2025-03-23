@@ -13,13 +13,22 @@ const Index = () => {
   const navigate = useNavigate();
   const {
     audioFiles,
-    currentFile,
     isLoading,
-    setMarkers,
     markers,
-    handleFileSelect,
-    handleSearch,
-    exportAudio,
+    addMarker,
+    removeMarker,
+    exportTrimmedAudio,
+    loadAudioFile,
+    loadFilesFromUNC,
+    formatTime,
+    formatTimeDetailed,
+    isPlaying,
+    currentTime,
+    duration,
+    volume,
+    togglePlay,
+    seek,
+    changeVolume,
   } = useAudio();
 
   // Check if the user is an admin
@@ -48,6 +57,14 @@ const Index = () => {
     localStorage.removeItem("currentUser");
     localStorage.removeItem("isAdmin");
     navigate("/login");
+  };
+
+  const handleFileSelect = (file) => {
+    loadAudioFile(file);
+  };
+
+  const handleSearch = (path, date, hour) => {
+    loadFilesFromUNC(path, date, hour);
   };
 
   return (
@@ -88,23 +105,31 @@ const Index = () => {
         <div className="md:col-span-2 lg:col-span-3 flex flex-col space-y-4 h-full overflow-hidden">
           <div className="flex-1 min-h-0">
             <AudioPlayer
-              file={currentFile}
-              markers={markers}
-              onMarkersChange={setMarkers}
+              isPlaying={isPlaying}
+              currentTime={currentTime}
+              duration={duration}
+              volume={volume}
+              onPlayPause={togglePlay}
+              onVolumeChange={changeVolume}
+              onSeek={seek}
+              formatTime={formatTime}
+              audioTitle={audioFiles.find(f => f.path === audioFiles)?.name || "Aucun audio chargé"}
             />
           </div>
 
           <div className="h-fit grid grid-cols-1 md:grid-cols-2 gap-4">
             <MarkerControls
               markers={markers}
-              onMarkersChange={setMarkers}
-              disabled={!currentFile}
+              onAddMarker={addMarker}
+              onExport={exportTrimmedAudio}
+              currentTime={currentTime}
+              formatTimeDetailed={formatTimeDetailed}
             />
 
             <div className="flex items-end justify-end">
               <Button
-                onClick={exportAudio}
-                disabled={!currentFile}
+                onClick={exportTrimmedAudio}
+                disabled={duration === 0}
                 size="lg"
                 className="w-full md:w-auto"
               >
