@@ -18,15 +18,30 @@ export const useAudioCleanup = (
     
     if (sourceNodeRef.current) {
       try {
-        // Only stop if not already stopped
-        sourceNodeRef.current.stop();
-        sourceNodeRef.current.disconnect();
+        // Check if the source node is currently playing
+        sourceNodeRef.current.onended = null; // Remove ended handler to prevent errors
+        
+        // Only stop if not already stopped and if the context is in a valid state
+        const state = sourceNodeRef.current.context.state;
+        if (state !== 'closed') {
+          try {
+            sourceNodeRef.current.stop();
+          } catch (stopError) {
+            // Ignore "cannot stop already stopped node" errors
+            console.log("Note: Audio source might already be stopped");
+          }
+          
+          try {
+            sourceNodeRef.current.disconnect();
+          } catch (disconnectError) {
+            console.log("Note: Audio source might already be disconnected");
+          }
+        }
+        
         sourceNodeRef.current = null;
       } catch (error) {
-        // Ignore "cannot stop already stopped node" errors
-        if (!(error instanceof Error) || !error.message.includes('stopped')) {
-          console.error("Error stopping source node:", error);
-        }
+        // Log the error but don't throw, to ensure cleanup continues
+        console.error("Error during audio cleanup:", error);
       }
     }
   }, [animationRef, sourceNodeRef]);

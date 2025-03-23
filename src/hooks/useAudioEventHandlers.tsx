@@ -49,7 +49,7 @@ export const useAudioEventHandlers = ({
       cleanup();
     };
     
-    const onError = (e: any) => {
+    const onError = (e: Event) => {
       console.error('Error loading audio:', e);
       setIsBuffering(false);
       
@@ -88,12 +88,32 @@ export const useAudioEventHandlers = ({
       try {
         // For blob URLs, try to fetch and decode the audio data
         if (audioSrc.startsWith('blob:')) {
-          console.log("Loading buffer for blob URL");
-          const buffer = await fetchAndDecodeAudio(audioSrc);
-          if (buffer) {
-            console.log("Successfully decoded blob audio buffer");
-            setAudioBuffer(buffer);
-          }
+          console.log("Loading buffer for blob URL:", audioSrc);
+          fetch(audioSrc)
+            .then(response => {
+              if (!response.ok) {
+                throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
+              }
+              return response.arrayBuffer();
+            })
+            .then(async arrayBuffer => {
+              console.log("Blob URL fetched successfully, buffer size:", arrayBuffer.byteLength);
+              try {
+                const buffer = await fetchAndDecodeAudio(audioSrc);
+                if (buffer) {
+                  console.log("Successfully decoded blob audio buffer");
+                  setAudioBuffer(buffer);
+                }
+              } catch (decodeError) {
+                console.error("Error decoding audio data:", decodeError);
+              }
+            })
+            .catch(fetchError => {
+              console.error("Error fetching blob URL:", fetchError);
+            })
+            .finally(() => {
+              setIsBuffering(false);
+            });
         } else {
           // For other sources, use the existing logic
           const buffer = await fetchAndDecodeAudio(audioSrc);
@@ -101,10 +121,10 @@ export const useAudioEventHandlers = ({
             setAudioBuffer(buffer);
             console.log("Audio buffer loaded successfully");
           }
+          setIsBuffering(false);
         }
       } catch (error) {
         console.error('Error loading audio buffer:', error);
-      } finally {
         setIsBuffering(false);
       }
     };

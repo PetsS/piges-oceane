@@ -40,25 +40,49 @@ export const LocalAudioLoader = ({ onFileLoad }: LocalAudioLoaderProps) => {
       lastModified: format(new Date(file.lastModified), 'yyyy-MM-dd')
     };
     
-    // Create a test Audio element to verify the blob URL works
-    const testAudio = new Audio();
-    testAudio.src = blobUrl;
-    testAudio.preload = "metadata";
-    
-    testAudio.addEventListener('loadedmetadata', () => {
-      console.log(`Successfully verified blob URL for ${file.name}, duration: ${testAudio.duration}s`);
-      toast.success(`Loaded: ${file.name} (${size} MB)`);
-      onFileLoad(audioFile);
-    }, { once: true });
-    
-    testAudio.addEventListener('error', (e) => {
-      console.error(`Error verifying blob URL for ${file.name}:`, e);
-      URL.revokeObjectURL(blobUrl);
-      toast.error(`Failed to load audio file: ${file.name}`);
-    }, { once: true });
-    
-    // Force load metadata
-    testAudio.load();
+    // Directly verify the blob URL works
+    fetch(blobUrl)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Failed to fetch blob: ${response.status} ${response.statusText}`);
+        }
+        return response.arrayBuffer();
+      })
+      .then(buffer => {
+        console.log(`Successfully verified blob data for ${file.name}, size: ${buffer.byteLength} bytes`);
+        
+        // Create a test Audio element to verify the blob URL works for audio playback
+        const testAudio = new Audio();
+        testAudio.src = blobUrl;
+        testAudio.preload = "metadata";
+        
+        const onMetadataLoaded = () => {
+          console.log(`Successfully verified blob URL for ${file.name}, duration: ${testAudio.duration}s`);
+          toast.success(`Loaded: ${file.name} (${size} MB)`);
+          onFileLoad(audioFile);
+          testAudio.removeEventListener('loadedmetadata', onMetadataLoaded);
+          testAudio.removeEventListener('error', onError);
+        };
+        
+        const onError = (e: Event) => {
+          console.error(`Error verifying blob URL for ${file.name}:`, e);
+          URL.revokeObjectURL(blobUrl);
+          toast.error(`Failed to load audio file: ${file.name}`);
+          testAudio.removeEventListener('loadedmetadata', onMetadataLoaded);
+          testAudio.removeEventListener('error', onError);
+        };
+        
+        testAudio.addEventListener('loadedmetadata', onMetadataLoaded);
+        testAudio.addEventListener('error', onError);
+        
+        // Force load metadata
+        testAudio.load();
+      })
+      .catch(error => {
+        console.error(`Error processing blob URL for ${file.name}:`, error);
+        URL.revokeObjectURL(blobUrl);
+        toast.error(`Failed to load audio file: ${file.name}`);
+      });
   };
   
   const handleDragOver = (e: React.DragEvent) => {

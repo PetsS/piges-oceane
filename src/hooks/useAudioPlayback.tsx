@@ -56,21 +56,27 @@ export const useAudioPlayback = () => {
     if (!isPlaying) {
       console.log("Attempting to play audio", audioRef.current.src);
       
-      // Add buffering indicator
-      setIsBuffering(true);
-      
-      audioRef.current.play()
-        .then(() => {
-          console.log("Audio playing successfully");
-          setIsPlaying(true);
-          setIsBuffering(false);
-          animationRef.current = requestAnimationFrame(animateTime);
-        })
-        .catch(error => {
-          console.error('Error playing audio:', error);
-          setIsBuffering(false);
-          toast.error('Failed to play audio. Please try again.');
-        });
+      // For local files check if we have a valid audio element
+      if (audioRef.current.src) {
+        // Add buffering indicator
+        setIsBuffering(true);
+        
+        audioRef.current.play()
+          .then(() => {
+            console.log("Audio playing successfully");
+            setIsPlaying(true);
+            setIsBuffering(false);
+            animationRef.current = requestAnimationFrame(animateTime);
+          })
+          .catch(error => {
+            console.error('Error playing audio:', error);
+            setIsBuffering(false);
+            toast.error('Failed to play audio. Please try again.');
+          });
+      } else {
+        console.error("No audio source available");
+        toast.error("No audio source available to play");
+      }
     } else {
       console.log("Pausing audio");
       audioRef.current.pause();
@@ -153,24 +159,31 @@ export const useAudioPlayback = () => {
     }
     
     console.log("Setting audio source to:", audioSrc);
-    audioRef.current.src = audioSrc;
-    audioRef.current.volume = volume;
-    audioRef.current.crossOrigin = "anonymous"; // Add this to handle CORS
     
-    // Set up audio event handlers
-    const cleanupEvents = setupAudioEvents(audioSrc);
-    
-    // Clean up resources when component unmounts or audioSrc changes
-    return () => {
-      cleanupEvents();
+    // Ensure we have a valid audio source
+    if (audioSrc && audioSrc !== 'synthetic-audio') {
+      audioRef.current.src = audioSrc;
+      audioRef.current.volume = volume;
+      audioRef.current.crossOrigin = "anonymous"; // Add this to handle CORS
       
-      if (audioRef.current?.src) {
-        audioRef.current.pause();
-        audioRef.current.src = '';
-      }
+      // Set up audio event handlers
+      const cleanupEvents = setupAudioEvents(audioSrc);
       
+      // Return cleanup function
+      return () => {
+        cleanupEvents();
+        
+        if (audioRef.current?.src) {
+          audioRef.current.pause();
+          audioRef.current.src = '';
+        }
+        
+        setIsBuffering(false);
+      };
+    } else {
+      // Handle synthetic audio case
       setIsBuffering(false);
-    };
+    }
   }, [audioSrc, volume, cleanup, isPlaying, setupAudioEvents]);
 
   // Clean up resources when component unmounts
