@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -103,11 +104,19 @@ export const useAudio = () => {
     return audioContextRef.current;
   };
 
-  const fetchAndDecodeAudio = async (url: string): Promise<AudioBuffer> => {
-    const response = await fetch(url);
-    const arrayBuffer = await response.arrayBuffer();
-    const audioContext = getAudioContext();
-    return await audioContext.decodeAudioData(arrayBuffer);
+  const fetchAndDecodeAudio = async (url: string): Promise<AudioBuffer | null> => {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch audio: ${response.status} ${response.statusText}`);
+      }
+      const arrayBuffer = await response.arrayBuffer();
+      const audioContext = getAudioContext();
+      return await audioContext.decodeAudioData(arrayBuffer);
+    } catch (error) {
+      console.error('Error decoding audio data:', error);
+      return null;
+    }
   };
 
   useEffect(() => {
@@ -160,10 +169,22 @@ export const useAudio = () => {
     
     const loadBuffer = async () => {
       try {
+        // Only try to load buffer if audio source is valid
+        if (!audioSrc) {
+          setAudioBuffer(null);
+          return;
+        }
+        
         const buffer = await fetchAndDecodeAudio(audioSrc);
         setAudioBuffer(buffer);
+        
+        if (!buffer) {
+          toast.error('Impossible de décoder le fichier audio. Essayez un autre format.');
+        }
       } catch (error) {
-        console.error('Error decoding audio data:', error);
+        console.error('Error loading audio buffer:', error);
+        setAudioBuffer(null);
+        toast.error('Erreur lors du chargement du fichier audio');
       }
     };
     
@@ -242,7 +263,7 @@ export const useAudio = () => {
 
   const exportTrimmedAudio = async () => {
     if (!audioBuffer || !currentAudioFile) {
-      toast.error('Aucun audio chargé');
+      toast.error('Aucun audio chargé ou fichier non compatible avec l\'export');
       return;
     }
     
@@ -272,6 +293,11 @@ export const useAudio = () => {
       const endSample = Math.min(Math.floor(endTime * sampleRate), audioBuffer.length);
       const frameCount = endSample - startSample;
       
+      if (frameCount <= 0) {
+        toast.error('Sélection audio invalide');
+        return;
+      }
+      
       const trimmedBuffer = audioContext.createBuffer(
         audioBuffer.numberOfChannels,
         frameCount,
@@ -284,6 +310,7 @@ export const useAudio = () => {
         trimmedBuffer.copyToChannel(channelData, channel);
       }
       
+      // Get export format from local storage
       const savedSettings = localStorage.getItem("appSettings");
       let currentExportFormat = exportFormat;
       
@@ -301,14 +328,19 @@ export const useAudio = () => {
       let trimmedAudioBlob: Blob;
       let fileExtension: string;
       
+      // For this version, all exports are WAV since we don't have a proper MP3 encoder
+      trimmedAudioBlob = await bufferToWav(trimmedBuffer);
+      
       if (currentExportFormat === "wav") {
-        trimmedAudioBlob = await bufferToWav(trimmedBuffer);
         fileExtension = "wav";
       } else {
-        trimmedAudioBlob = await bufferToWav(trimmedBuffer);
+        // In a real application, you would use a proper MP3 encoder library here
         fileExtension = "wav";
-        
-        toast.info(`Note: L'export MP3 n'est pas implémenté dans cette version de démonstration. Le fichier a été exporté en WAV.`, { duration: 5000 });
+        const bitrateSuffix = currentExportFormat.split('-')[1] || '128k';
+        toast.info(
+          `L'export MP3 ${bitrateSuffix} n'est pas implémenté dans cette version. Le fichier a été exporté en WAV.`,
+          { duration: 5000 }
+        );
       }
       
       const originalName = currentAudioFile.name.replace(/\.[^/.]+$/, "");
@@ -344,6 +376,7 @@ export const useAudio = () => {
       const length = buffer.length * numOfChannels * 2;
       const sampleRate = buffer.sampleRate;
       
+      // Create WAV file header
       const wavBuffer = new ArrayBuffer(44 + length);
       const view = new DataView(wavBuffer);
       
@@ -361,12 +394,14 @@ export const useAudio = () => {
       writeString(view, 36, 'data');
       view.setUint32(40, length, true);
       
+      // Write audio data
       const offset = 44;
       let pos = offset;
       
       for (let i = 0; i < buffer.length; i++) {
         for (let channel = 0; channel < numOfChannels; channel++) {
           const sample = buffer.getChannelData(channel)[i];
+          // Convert float to 16-bit PCM
           const int = Math.max(-1, Math.min(1, sample)) * 0x7FFF;
           view.setInt16(pos, int, true);
           pos += 2;
@@ -394,7 +429,9 @@ export const useAudio = () => {
       setCurrentTime(0);
       setIsLoading(false);
     } else {
+      // For network paths, load a sample audio instead
       setTimeout(() => {
+        // Use a reliable sample audio file that we know works
         setAudioSrc('https://audio-samples.github.io/samples/mp3/blizzard_biased/blizzard_01.mp3');
         setIsPlaying(false);
         setCurrentTime(0);
