@@ -29,6 +29,7 @@ const Index = () => {
     togglePlay,
     seek,
     changeVolume,
+    currentFile,
   } = useAudio();
 
   // Check if the user is an admin
@@ -113,7 +114,7 @@ const Index = () => {
               onVolumeChange={changeVolume}
               onSeek={seek}
               formatTime={formatTime}
-              audioTitle={audioFiles.find(f => f.path === audioFiles)?.name || "Aucun audio chargé"}
+              audioTitle={currentFile ? currentFile.name : "Aucun audio chargé"}
             />
           </div>
 

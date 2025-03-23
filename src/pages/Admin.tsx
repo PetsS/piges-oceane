@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -33,9 +32,9 @@ const Admin = () => {
   const [settings, setSettings] = useState<Settings>({
     headerTitle: "Lecteur Audio",
     buttonColors: {
-      primary: "#1d4ed8", // blue-700
-      secondary: "#4b5563", // gray-600
-      accent: "#059669", // emerald-600
+      primary: "hsl(221, 83%, 53%)",
+      secondary: "hsl(210, 40%, 96%)",
+      accent: "hsl(210, 40%, 96%)",
     },
     audioFolderPath: "\\\\server\\audioLogs",
   });
@@ -105,12 +104,70 @@ const Admin = () => {
   const handleSaveSettings = () => {
     localStorage.setItem("appSettings", JSON.stringify(settings));
     
-    // Apply the CSS variables for colors
-    document.documentElement.style.setProperty('--primary', settings.buttonColors.primary);
-    document.documentElement.style.setProperty('--secondary', settings.buttonColors.secondary);
-    document.documentElement.style.setProperty('--accent', settings.buttonColors.accent);
+    // Apply the CSS variables for colors in HSL format
+    document.documentElement.style.setProperty('--primary', colorToHsl(settings.buttonColors.primary));
+    document.documentElement.style.setProperty('--secondary', colorToHsl(settings.buttonColors.secondary));
+    document.documentElement.style.setProperty('--accent', colorToHsl(settings.buttonColors.accent));
     
     toast.success("Paramètres enregistrés avec succès");
+  };
+
+  // Convert hex or rgb color to HSL format for CSS variables
+  const colorToHsl = (color: string) => {
+    // If it's already in HSL format, extract the values
+    if (color.startsWith('hsl')) {
+      const match = color.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
+      if (match) {
+        return `${match[1]} ${match[2]}% ${match[3]}%`;
+      }
+    }
+    
+    // Try to convert hex to HSL
+    let r = 0, g = 0, b = 0;
+    
+    // Check if it's a hex color
+    if (color.startsWith('#')) {
+      const hex = color.slice(1);
+      r = parseInt(hex.length === 3 ? hex[0] + hex[0] : hex.substring(0, 2), 16);
+      g = parseInt(hex.length === 3 ? hex[1] + hex[1] : hex.substring(2, 4), 16);
+      b = parseInt(hex.length === 3 ? hex[2] + hex[2] : hex.substring(4, 6), 16);
+    } 
+    // Otherwise assume it's RGB
+    else if (color.startsWith('rgb')) {
+      const match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*\d+(?:\.\d+)?)?\)/);
+      if (match) {
+        r = parseInt(match[1], 10);
+        g = parseInt(match[2], 10);
+        b = parseInt(match[3], 10);
+      }
+    }
+    
+    r /= 255;
+    g /= 255;
+    b /= 255;
+    
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    let h = 0, s = 0, l = (max + min) / 2;
+    
+    if (max !== min) {
+      const d = max - min;
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      
+      switch (max) {
+        case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+        case g: h = (b - r) / d + 2; break;
+        case b: h = (r - g) / d + 4; break;
+      }
+      
+      h /= 6;
+    }
+    
+    h = Math.round(h * 360);
+    s = Math.round(s * 100);
+    l = Math.round(l * 100);
+    
+    return `${h} ${s}% ${l}%`;
   };
 
   return (
