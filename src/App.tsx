@@ -1,47 +1,37 @@
 
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
-import NotFound from "./pages/NotFound";
-import Login from "./pages/Login";
-import Admin from "./pages/Admin";
-import PrivateRoute from "./components/PrivateRoute";
+import PrivateRoute from "@/components/PrivateRoute";
+import { SettingsProvider } from "@/contexts/SettingsContext";
 
-const queryClient = new QueryClient();
+const Login = lazy(() => import("@/pages/Login"));
+const Index = lazy(() => import("@/pages/Index"));
+const Admin = lazy(() => import("@/pages/Admin"));
+const NotFound = lazy(() => import("@/pages/NotFound"));
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route 
-            path="/" 
-            element={
+function App() {
+  return (
+    <BrowserRouter>
+      <SettingsProvider>
+        <Suspense fallback={<div className="flex items-center justify-center h-screen">Chargement...</div>}>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/" element={
               <PrivateRoute>
                 <Index />
               </PrivateRoute>
-            } 
-          />
-          <Route path="/login" element={<Login />} />
-          <Route 
-            path="/admin" 
-            element={
+            } />
+            <Route path="/admin" element={
               <PrivateRoute>
                 <Admin />
               </PrivateRoute>
-            } 
-          />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+            } />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Suspense>
+      </SettingsProvider>
+    </BrowserRouter>
+  );
+}
 
 export default App;

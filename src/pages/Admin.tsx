@@ -21,6 +21,8 @@ import {
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useSettings } from "@/contexts/SettingsContext";
+import { CityFolder } from "@/utils/settingsService";
 
 interface User {
   username: string;
@@ -28,42 +30,13 @@ interface User {
   isAdmin: boolean;
 }
 
-interface CityFolder {
-  displayName: string;
-  folderName: string;
-}
-
-interface Settings {
-  headerTitle: string;
-  buttonColors: {
-    primary: string;
-    secondary: string;
-    accent: string;
-  };
-  audioFolderPath: string;
-  cities: string[] | CityFolder[];
-}
-
 const Admin = () => {
   const navigate = useNavigate();
   const [users, setUsers] = useState<User[]>([]);
   const [newUser, setNewUser] = useState<User>({ username: "", password: "", isAdmin: false });
-  const [settings, setSettings] = useState<Settings>({
-    headerTitle: "Lecteur Audio",
-    buttonColors: {
-      primary: "hsl(221, 83%, 53%)",
-      secondary: "hsl(210, 40%, 96%)",
-      accent: "hsl(210, 40%, 96%)",
-    },
-    audioFolderPath: "\\\\server\\audioLogs",
-    cities: [
-      { displayName: "Paris", folderName: "paris" },
-      { displayName: "Lyon", folderName: "lyon" },
-      { displayName: "Marseille", folderName: "marseille" },
-      { displayName: "Bordeaux", folderName: "bordeaux" }
-    ]
-  });
+  const { settings, updateSettings, isLoading: settingsLoading } = useSettings();
   
+  const [localSettings, setLocalSettings] = useState(settings);
   const [newCityDisplayName, setNewCityDisplayName] = useState("");
   const [newCityFolderName, setNewCityFolderName] = useState("");
   const [editingCity, setEditingCity] = useState<CityFolder | null>(null);
@@ -75,15 +48,11 @@ const Admin = () => {
   const [editingUser, setEditingUser] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<string>("user");
 
-  const migrateOldCityFormat = (cities: any[]): CityFolder[] => {
-    if (cities.length > 0 && typeof cities[0] === 'string') {
-      return cities.map(city => ({
-        displayName: city.charAt(0).toUpperCase() + city.slice(1),
-        folderName: city
-      }));
+  useEffect(() => {
+    if (settings) {
+      setLocalSettings(settings);
     }
-    return cities as CityFolder[];
-  };
+  }, [settings]);
 
   useEffect(() => {
     const currentUser = localStorage.getItem("currentUser");
@@ -109,31 +78,6 @@ const Admin = () => {
       ];
       localStorage.setItem("users", JSON.stringify(defaultUsers));
       setUsers(defaultUsers);
-    }
-
-    const savedSettings = localStorage.getItem("appSettings");
-    if (savedSettings) {
-      try {
-        const parsedSettings = JSON.parse(savedSettings);
-        
-        if (!parsedSettings.cities || !Array.isArray(parsedSettings.cities)) {
-          parsedSettings.cities = [
-            { displayName: "Paris", folderName: "paris" },
-            { displayName: "Lyon", folderName: "lyon" },
-            { displayName: "Marseille", folderName: "marseille" },
-            { displayName: "Bordeaux", folderName: "bordeaux" }
-          ];
-        } else {
-          parsedSettings.cities = migrateOldCityFormat(parsedSettings.cities);
-        }
-                
-        setSettings(parsedSettings);
-      } catch (error) {
-        console.error("Error parsing settings from localStorage:", error);
-        localStorage.setItem("appSettings", JSON.stringify(settings));
-      }
-    } else {
-      localStorage.setItem("appSettings", JSON.stringify(settings));
     }
   }, [navigate]);
 
@@ -169,14 +113,10 @@ const Admin = () => {
     toast.success("Utilisateur supprimé avec succès");
   };
 
-  const handleSaveSettings = () => {
-    localStorage.setItem("appSettings", JSON.stringify(settings));
+  const handleSaveSettings = async () => {
+    if (!localSettings) return;
     
-    document.documentElement.style.setProperty('--primary', colorToHsl(settings.buttonColors.primary));
-    document.documentElement.style.setProperty('--secondary', colorToHsl(settings.buttonColors.secondary));
-    document.documentElement.style.setProperty('--accent', colorToHsl(settings.buttonColors.accent));
-    
-    toast.success("Paramètres enregistrés avec succès");
+    await updateSettings(localSettings);
   };
 
   const handleChangePassword = () => {
@@ -213,13 +153,15 @@ const Admin = () => {
   };
 
   const handleAddCity = () => {
+    if (!localSettings) return;
+    
     if (!newCityDisplayName.trim() || !newCityFolderName.trim()) {
       toast.error("Veuillez remplir tous les champs");
       return;
     }
     
     const folderNameLower = newCityFolderName.trim().toLowerCase();
-    const cities = settings.cities as CityFolder[];
+    const cities = localSettings.cities as CityFolder[];
     
     if (cities.some(city => city.folderName === folderNameLower)) {
       toast.error("Ce nom de dossier existe déjà dans la liste");
@@ -231,18 +173,17 @@ const Admin = () => {
       folderName: folderNameLower 
     }];
     
-    const updatedSettings = {...settings, cities: updatedCities};
-    setSettings(updatedSettings);
-    
-    localStorage.setItem("appSettings", JSON.stringify(updatedSettings));
+    const updatedSettings = {...localSettings, cities: updatedCities};
+    setLocalSettings(updatedSettings);
     
     setNewCityDisplayName("");
     setNewCityFolderName("");
-    toast.success(`Ville "${newCityDisplayName}" ajoutée à la liste`);
   };
 
   const handleRemoveCity = (folderName: string) => {
-    const cities = settings.cities as CityFolder[];
+    if (!localSettings) return;
+    
+    const cities = localSettings.cities as CityFolder[];
     if (cities.length <= 1) {
       toast.error("Vous devez garder au moins une ville dans la liste");
       return;
@@ -250,26 +191,21 @@ const Admin = () => {
     
     const updatedCities = cities.filter(city => city.folderName !== folderName);
     
-    const updatedSettings = {...settings, cities: updatedCities};
-    setSettings(updatedSettings);
-    
-    localStorage.setItem("appSettings", JSON.stringify(updatedSettings));
-    
-    toast.success(`Ville supprimée de la liste`);
+    const updatedSettings = {...localSettings, cities: updatedCities};
+    setLocalSettings(updatedSettings);
   };
 
   const handleUpdateCity = () => {
-    if (!editingCity) return;
+    if (!localSettings || !editingCity) return;
     
     if (!editingCity.displayName.trim() || !editingCity.folderName.trim()) {
       toast.error("Veuillez remplir tous les champs");
       return;
     }
     
-    const cities = settings.cities as CityFolder[];
+    const cities = localSettings.cities as CityFolder[];
     const folderNameLower = editingCity.folderName.trim().toLowerCase();
     
-    // Check if another city has the same folder name except the one we're editing
     const duplicateFolder = cities.some(
       city => city.folderName !== originalFolderName && 
               city.folderName === folderNameLower
@@ -290,10 +226,8 @@ const Admin = () => {
       return city;
     });
     
-    const updatedSettings = {...settings, cities: updatedCities};
-    setSettings(updatedSettings);
-    
-    localStorage.setItem("appSettings", JSON.stringify(updatedSettings));
+    const updatedSettings = {...localSettings, cities: updatedCities};
+    setLocalSettings(updatedSettings);
     
     setEditingCity(null);
     toast.success("Ville modifiée avec succès");
@@ -320,58 +254,20 @@ const Admin = () => {
     toast.success(`Rôle modifié pour ${editingUser}`);
   };
 
-  const colorToHsl = (color: string) => {
-    if (color.startsWith('hsl')) {
-      const match = color.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
-      if (match) {
-        return `${match[1]} ${match[2]}% ${match[3]}%`;
-      }
-    }
-    
-    let r = 0, g = 0, b = 0;
-    
-    if (color.startsWith('#')) {
-      const hex = color.slice(1);
-      r = parseInt(hex.length === 3 ? hex[0] + hex[0] : hex.substring(0, 2), 16);
-      g = parseInt(hex.length === 3 ? hex[1] + hex[1] : hex.substring(2, 4), 16);
-      b = parseInt(hex.length === 3 ? hex[2] + hex[2] : hex.substring(4, 6), 16);
-    } 
-    else if (color.startsWith('rgb')) {
-      const match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*\d+(?:\.\d+)?)?\)/);
-      if (match) {
-        r = parseInt(match[1], 10);
-        g = parseInt(match[2], 10);
-        b = parseInt(match[3], 10);
-      }
-    }
-    
-    r /= 255;
-    g /= 255;
-    b /= 255;
-    
-    const max = Math.max(r, g, b);
-    const min = Math.min(r, g, b);
-    let h = 0, s = 0, l = (max + min) / 2;
-    
-    if (max !== min) {
-      const d = max - min;
-      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-      
-      switch (max) {
-        case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-        case g: h = (b - r) / d + 2; break;
-        case b: h = (r - g) / d + 4; break;
-      }
-      
-      h /= 6;
-    }
-    
-    h = Math.round(h * 360);
-    s = Math.round(s * 100);
-    l = Math.round(l * 100);
-    
-    return `${h} ${s}% ${l}%`;
-  };
+  if (!localSettings) {
+    return (
+      <div className="container mx-auto p-6 flex justify-center items-center h-[80vh]">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-4">Chargement des paramètres...</h2>
+          {settingsLoading ? (
+            <p>Récupération des paramètres depuis le serveur...</p>
+          ) : (
+            <p>Impossible de charger les paramètres. Veuillez rafraîchir la page.</p>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto p-6 max-w-6xl">
@@ -613,8 +509,8 @@ const Admin = () => {
                   <Label htmlFor="headerTitle">Titre principal</Label>
                   <Input
                     id="headerTitle"
-                    value={settings.headerTitle}
-                    onChange={(e) => setSettings({...settings, headerTitle: e.target.value})}
+                    value={localSettings.headerTitle}
+                    onChange={(e) => setLocalSettings({...localSettings, headerTitle: e.target.value})}
                     placeholder="Titre principal de l'application"
                   />
                 </div>
@@ -641,45 +537,45 @@ const Admin = () => {
                   <div className="space-y-3">
                     <Label>Couleur principale (boutons d'action)</Label>
                     <ColorPicker
-                      color={settings.buttonColors.primary}
-                      onChange={(color) => setSettings({
-                        ...settings, 
-                        buttonColors: {...settings.buttonColors, primary: color}
+                      color={localSettings.buttonColors.primary}
+                      onChange={(color) => setLocalSettings({
+                        ...localSettings, 
+                        buttonColors: {...localSettings.buttonColors, primary: color}
                       })}
                     />
                     <div 
                       className="h-10 rounded-md border"
-                      style={{ backgroundColor: settings.buttonColors.primary }}
+                      style={{ backgroundColor: localSettings.buttonColors.primary }}
                     />
                   </div>
                   
                   <div className="space-y-3">
                     <Label>Couleur secondaire</Label>
                     <ColorPicker
-                      color={settings.buttonColors.secondary}
-                      onChange={(color) => setSettings({
-                        ...settings, 
-                        buttonColors: {...settings.buttonColors, secondary: color}
+                      color={localSettings.buttonColors.secondary}
+                      onChange={(color) => setLocalSettings({
+                        ...localSettings, 
+                        buttonColors: {...localSettings.buttonColors, secondary: color}
                       })}
                     />
                     <div 
                       className="h-10 rounded-md border"
-                      style={{ backgroundColor: settings.buttonColors.secondary }}
+                      style={{ backgroundColor: localSettings.buttonColors.secondary }}
                     />
                   </div>
                   
                   <div className="space-y-3">
                     <Label>Couleur d'accent (marqueurs)</Label>
                     <ColorPicker
-                      color={settings.buttonColors.accent}
-                      onChange={(color) => setSettings({
-                        ...settings, 
-                        buttonColors: {...settings.buttonColors, accent: color}
+                      color={localSettings.buttonColors.accent}
+                      onChange={(color) => setLocalSettings({
+                        ...localSettings, 
+                        buttonColors: {...localSettings.buttonColors, accent: color}
                       })}
                     />
                     <div 
                       className="h-10 rounded-md border"
-                      style={{ backgroundColor: settings.buttonColors.accent }}
+                      style={{ backgroundColor: localSettings.buttonColors.accent }}
                     />
                   </div>
                 </div>
@@ -706,8 +602,8 @@ const Admin = () => {
                   <Label htmlFor="audioFolder">Chemin du dossier audio</Label>
                   <Input
                     id="audioFolder"
-                    value={settings.audioFolderPath}
-                    onChange={(e) => setSettings({...settings, audioFolderPath: e.target.value})}
+                    value={localSettings.audioFolderPath}
+                    onChange={(e) => setLocalSettings({...localSettings, audioFolderPath: e.target.value})}
                     placeholder="Chemin du dossier (ex: \\server\audioLogs)"
                   />
                 </div>
@@ -759,8 +655,8 @@ const Admin = () => {
                 <div className="space-y-2">
                   <h3 className="text-lg font-medium">Villes disponibles</h3>
                   <div className="border rounded-md divide-y">
-                    {settings.cities && Array.isArray(settings.cities) && settings.cities.length > 0 ? 
-                      (settings.cities as CityFolder[]).map((city) => (
+                    {localSettings.cities && Array.isArray(localSettings.cities) && localSettings.cities.length > 0 ? 
+                      (localSettings.cities as CityFolder[]).map((city) => (
                         <div key={city.folderName} className="p-4 flex justify-between items-center">
                           <div>
                             <p className="font-medium">{city.displayName}</p>
@@ -859,4 +755,3 @@ const Admin = () => {
 };
 
 export default Admin;
-

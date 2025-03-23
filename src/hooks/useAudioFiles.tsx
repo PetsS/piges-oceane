@@ -3,6 +3,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { AudioFile } from './useAudioTypes';
+import { useSettings } from '@/contexts/SettingsContext';
 
 export const useAudioFiles = (
   setAudioSrc: (src: string | null) => void,
@@ -17,6 +18,7 @@ export const useAudioFiles = (
   const [audioFiles, setAudioFiles] = useState<AudioFile[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [currentAudioFile, setCurrentAudioFile] = useState<AudioFile | null>(null);
+  const { settings } = useSettings();
 
   const loadFilesFromUNC = useCallback(async (path: string, city: string, date: Date, hour: string | null) => {
     setIsLoading(true);
@@ -53,30 +55,29 @@ export const useAudioFiles = (
       
       setIsLoading(false);
     }, 1500);
-  }, []);
+  }, [loadAudioFile]);
 
   // Initialize with default files on component mount
   useEffect(() => {
+    if (!settings) return;
+    
     const today = new Date();
     const currentHour = today.getHours().toString().padStart(2, '0');
-    const defaultCity = 'paris';
     
-    const savedSettings = localStorage.getItem("appSettings");
-    let audioFolderPath = `\\\\server\\audioLogs`;
+    // Get the first city from settings or default to 'paris'
+    const defaultCity = settings.cities && settings.cities.length > 0 
+      ? settings.cities[0].folderName 
+      : 'paris';
     
-    if (savedSettings) {
-      try {
-        const settings = JSON.parse(savedSettings);
-        if (settings.audioFolderPath) {
-          audioFolderPath = settings.audioFolderPath;
-        }
-      } catch (error) {
-        console.error("Error parsing settings:", error);
-      }
-    }
+    const audioFolderPath = settings.audioFolderPath || '\\\\server\\audioLogs';
     
-    loadFilesFromUNC(`${audioFolderPath}\\${defaultCity}\\${format(today, 'yyyy-MM-dd')}`, defaultCity, today, currentHour);
-  }, [loadFilesFromUNC]);
+    loadFilesFromUNC(
+      `${audioFolderPath}\\${defaultCity}\\${format(today, 'yyyy-MM-dd')}`, 
+      defaultCity, 
+      today, 
+      currentHour
+    );
+  }, [settings, loadFilesFromUNC]);
 
   const loadAudioFile = useCallback((file: AudioFile) => {
     setIsLoading(true);
