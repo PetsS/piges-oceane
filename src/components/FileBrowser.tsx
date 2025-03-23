@@ -45,7 +45,7 @@ export const FileBrowser = ({
   return (
     <div className="w-full flex flex-col h-full glass-panel rounded-lg overflow-hidden animate-fade-in">
       <div className="p-4 bg-secondary/50 backdrop-blur-md border-b">
-        <h3 className="text-lg font-medium mb-4">Audio Logger Search</h3>
+        <h3 className="text-lg font-medium mb-4">Recherche d'Enregistrements</h3>
         
         <div className="flex space-x-2 mb-4">
           <div className="relative flex-1">
@@ -53,7 +53,7 @@ export const FileBrowser = ({
               value={basePath}
               onChange={(e) => setBasePath(e.target.value)}
               className="pl-9 bg-white/50 border-0 focus-visible:ring-1"
-              placeholder="Base UNC Path"
+              placeholder="Chemin UNC de base"
             />
             <Folder className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           </div>
@@ -63,7 +63,7 @@ export const FileBrowser = ({
           <div className="space-y-2">
             <label className="text-sm font-medium flex items-center gap-2">
               <Calendar className="h-4 w-4" />
-              <span>Select Date</span>
+              <span>Sélectionner une date</span>
             </label>
             <DatePicker
               date={selectedDate}
@@ -74,7 +74,7 @@ export const FileBrowser = ({
           <div className="space-y-2">
             <label className="text-sm font-medium flex items-center gap-2">
               <Clock className="h-4 w-4" />
-              <span>Select Hour</span>
+              <span>Sélectionner une heure</span>
             </label>
             <div className="grid grid-cols-6 gap-1.5">
               {hours.map((hour) => (
@@ -101,7 +101,7 @@ export const FileBrowser = ({
             disabled={!selectedDate}
           >
             <Search className="h-4 w-4 mr-2" />
-            Find Audio Files
+            Rechercher les fichiers audio
           </Button>
         </div>
       </div>
@@ -115,15 +115,15 @@ export const FileBrowser = ({
               <div className="relative">
                 <div className="h-10 w-10 rounded-full border-2 border-primary/30 border-t-primary animate-spin"></div>
               </div>
-              <p className="text-sm text-muted-foreground">Searching for audio files...</p>
+              <p className="text-sm text-muted-foreground">Recherche de fichiers audio...</p>
             </div>
           </div>
         ) : files.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full p-8 text-center">
             <FileAudio className="h-12 w-12 text-muted-foreground mb-4 opacity-50" />
-            <p className="text-lg font-medium text-foreground/80">No audio files found</p>
+            <p className="text-lg font-medium text-foreground/80">Aucun fichier audio trouvé</p>
             <p className="text-sm text-muted-foreground mt-1">
-              Try a different date or hour
+              Essayez une date ou une heure différente
             </p>
           </div>
         ) : (

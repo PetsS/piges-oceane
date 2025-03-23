@@ -62,8 +62,8 @@ const Index = () => {
             </svg>
           </div>
           <div>
-            <h1 className="text-xl font-semibold tracking-tight">Audio Logger</h1>
-            <p className="text-xs text-muted-foreground">Hourly audio recordings</p>
+            <h1 className="text-xl font-semibold tracking-tight">Enregistreur Audio</h1>
+            <p className="text-xs text-muted-foreground">Enregistrements audio horaires</p>
           </div>
         </div>
       </header>
@@ -105,7 +105,7 @@ const Index = () => {
                 onVolumeChange={changeVolume}
                 onSeek={seek}
                 formatTime={formatTime}
-                audioTitle={selectedFile ? `${selectedFile} (60 min)` : "No file selected"}
+                audioTitle={selectedFile ? `${selectedFile} (60 min)` : "Aucun fichier sélectionné"}
               />
 
               <MarkerControls

@@ -35,7 +35,7 @@ export const MarkerControls = ({
   return (
     <div className="flex flex-col glass-panel rounded-lg p-4 space-y-4 animate-fade-in">
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-medium">Markers</h3>
+        <h3 className="text-lg font-medium">Marqueurs</h3>
         <Badge variant="secondary" className="font-mono text-xs">
           {formatTimeDetailed(currentTime)}
         </Badge>
@@ -59,11 +59,11 @@ export const MarkerControls = ({
                     startMarker ? "text-green-500" : "text-foreground"
                   } group-hover:scale-110 transition-transform`}
                 />
-                <span>Start Marker</span>
+                <span>Marqueur début</span>
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom">
-              <p>Set the start position for trimming</p>
+              <p>Définir le point de départ pour le découpage</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -85,11 +85,11 @@ export const MarkerControls = ({
                     endMarker ? "text-red-500" : "text-foreground"
                   } group-hover:scale-110 transition-transform`}
                 />
-                <span>End Marker</span>
+                <span>Marqueur fin</span>
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom">
-              <p>Set the end position for trimming</p>
+              <p>Définir le point de fin pour le découpage</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -101,7 +101,7 @@ export const MarkerControls = ({
             <div>
               <div className="text-sm font-medium flex items-center">
                 <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
-                Start Marker
+                Marqueur début
               </div>
               <div className="text-xs text-muted-foreground font-mono">
                 {formatTimeDetailed(startMarker.position)}
@@ -115,7 +115,7 @@ export const MarkerControls = ({
             <div>
               <div className="text-sm font-medium flex items-center">
                 <div className="w-2 h-2 rounded-full bg-red-500 mr-2"></div>
-                End Marker
+                Marqueur fin
               </div>
               <div className="text-xs text-muted-foreground font-mono">
                 {formatTimeDetailed(endMarker.position)}
@@ -127,7 +127,7 @@ export const MarkerControls = ({
         {startMarker && endMarker && (
           <div className="flex justify-between items-center p-3 rounded-md bg-blue-50 border border-blue-100 animate-scale-in">
             <div>
-              <div className="text-sm font-medium">Duration</div>
+              <div className="text-sm font-medium">Durée</div>
               <div className="text-xs text-muted-foreground font-mono">
                 {formatTimeDetailed(
                   endMarker.position - startMarker.position
@@ -144,7 +144,7 @@ export const MarkerControls = ({
         className="w-full mt-auto transition-all duration-300 hover:shadow-md hover:translate-y-[-1px]"
       >
         <Scissors className="h-4 w-4 mr-2" />
-        Export Trimmed Audio
+        Exporter l'audio découpé
       </Button>
     </div>
   );

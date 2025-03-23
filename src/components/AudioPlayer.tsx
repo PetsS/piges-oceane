@@ -34,7 +34,7 @@ export const AudioPlayer = ({
   onVolumeChange,
   onSeek,
   formatTime,
-  audioTitle = "No audio loaded",
+  audioTitle = "Aucun audio chargé",
 }: AudioPlayerProps) => {
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
   
