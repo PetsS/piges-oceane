@@ -40,7 +40,7 @@ export const useAudio = () => {
       if (hour) {
         const mockFile: AudioFile = {
           name: `${hour}.mp3`,
-          path: `\\\\server\\audioLogs\\${city}\\${dateStr}\\${hour}.mp3`,
+          path: `${path}\\${hour}.mp3`,
           size: '58.2 MB',
           type: 'audio/mpeg',
           lastModified: format(date, 'yyyy-MM-dd')
@@ -54,7 +54,7 @@ export const useAudio = () => {
           const hourStr = i.toString().padStart(2, '0');
           return {
             name: `${hourStr}.mp3`,
-            path: `\\\\server\\audioLogs\\${city}\\${dateStr}\\${hourStr}.mp3`,
+            path: `${path}\\${hourStr}.mp3`,
             size: `${Math.floor(50 + Math.random() * 10)}.${Math.floor(Math.random() * 10)}MB`,
             type: 'audio/mpeg',
             lastModified: format(date, 'yyyy-MM-dd')
@@ -73,7 +73,22 @@ export const useAudio = () => {
     const currentHour = today.getHours().toString().padStart(2, '0');
     const defaultCity = 'paris';
     
-    loadFilesFromUNC(`\\\\server\\audioLogs`, defaultCity, today, currentHour);
+    // Load from saved settings if available
+    const savedSettings = localStorage.getItem("appSettings");
+    let audioFolderPath = `\\\\server\\audioLogs`;
+    
+    if (savedSettings) {
+      try {
+        const settings = JSON.parse(savedSettings);
+        if (settings.audioFolderPath) {
+          audioFolderPath = settings.audioFolderPath;
+        }
+      } catch (error) {
+        console.error("Error parsing settings:", error);
+      }
+    }
+    
+    loadFilesFromUNC(`${audioFolderPath}\\${defaultCity}\\${format(today, 'yyyy-MM-dd')}`, defaultCity, today, currentHour);
   }, [loadFilesFromUNC]);
 
   useEffect(() => {
@@ -215,7 +230,7 @@ export const useAudio = () => {
     
     const pathParts = audioSrc.split('\\');
     const fileName = pathParts[pathParts.length - 1];
-    const dateFolder = pathParts[pathParts.length - 2];
+    const dateFolder = pathParts[pathParts.length - 2] || 'audio';
     
     const exportFileName = `${dateFolder}_${fileName.replace('.mp3', '')}_${formatTime(startTime).replace(':', '')}-${formatTime(endTime).replace(':', '')}.mp3`;
     
@@ -238,7 +253,26 @@ export const useAudio = () => {
     setCurrentAudioFile(file);
     
     setTimeout(() => {
-      setAudioSrc('https://audio-samples.github.io/samples/mp3/blizzard_biased/blizzard_01.mp3');
+      // For local file paths, convert backslashes to forward slashes and use the file:// protocol
+      let audioPath = file.path;
+      
+      // Check if it's a local path rather than a network path
+      if (!audioPath.startsWith('http') && !audioPath.startsWith('https')) {
+        // Fix file path format for HTML5 Audio element
+        audioPath = audioPath.replace(/\\/g, '/');
+        
+        // If not already prefixed with file://, add it for local files
+        if (!audioPath.startsWith('file://')) {
+          audioPath = `file:///${audioPath}`;
+        }
+        
+        // For testing purposes, fall back to a sample audio URL if local file access fails
+        setAudioSrc('https://audio-samples.github.io/samples/mp3/blizzard_biased/blizzard_01.mp3');
+        
+        toast.info("Remarque: L'accès aux fichiers locaux peut être limité par les restrictions du navigateur. Si l'audio ne se charge pas, vérifiez que le chemin est correct et accessible.");
+      } else {
+        setAudioSrc(audioPath);
+      }
       
       // Markers will be set in the setAudioData function when the audio loads
       setIsPlaying(false);

@@ -44,6 +44,7 @@ export const FileBrowser = ({
     { displayName: "Marseille", folderName: "marseille" },
     { displayName: "Bordeaux", folderName: "bordeaux" }
   ]);
+  const [isLocalPath, setIsLocalPath] = useState(false);
 
   // Load audio folder path and cities from settings
   useEffect(() => {
@@ -53,6 +54,9 @@ export const FileBrowser = ({
         const settings = JSON.parse(savedSettings);
         if (settings.audioFolderPath) {
           setAudioFolderPath(settings.audioFolderPath);
+          
+          // Check if it's a local path (doesn't start with \\)
+          setIsLocalPath(!settings.audioFolderPath.startsWith('\\\\'));
         }
         
         if (settings.cities && Array.isArray(settings.cities)) {
@@ -88,8 +92,16 @@ export const FileBrowser = ({
     // Format date as YYYY-MM-DD for folder structure
     const dateFolder = format(selectedDate, "yyyy-MM-dd");
     
-    // Generate path using the base path, city folder, date folder, and optionally the hour file
-    const fullPath = `${audioFolderPath}\\${selectedCityFolder}\\${dateFolder}${selectedHour ? `\\${selectedHour}.mp3` : ''}`;
+    // Generate path based on whether it's a local path or a network path
+    let fullPath;
+    
+    if (isLocalPath) {
+      // For local paths, construct the path without doubling the backslashes
+      fullPath = `${audioFolderPath}\\${selectedCityFolder}\\${dateFolder}${selectedHour ? `\\${selectedHour}.mp3` : ''}`;
+    } else {
+      // For network paths (UNC), ensure the format starts with double backslashes
+      fullPath = `${audioFolderPath}\\${selectedCityFolder}\\${dateFolder}${selectedHour ? `\\${selectedHour}.mp3` : ''}`;
+    }
     
     onPathChange(fullPath, selectedCityFolder, selectedDate, selectedHour);
   };
