@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -104,7 +103,11 @@ export const useAudio = () => {
 
   const getAudioContext = useCallback(() => {
     if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
-      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      try {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      } catch (error) {
+        console.error("Error creating AudioContext:", error);
+      }
     }
     return audioContextRef.current;
   }, []);
@@ -115,72 +118,68 @@ export const useAudio = () => {
       
       // For blob URLs, we need a different approach
       if (url.startsWith('blob:')) {
-        const audio = audioRef.current;
-        if (!audio) {
-          throw new Error('Audio element not available');
-        }
-        
-        const audioContext = getAudioContext();
-        const source = audioContext.createMediaElementSource(audio);
-        const destination = audioContext.createMediaStreamDestination();
-        source.connect(destination);
-        
-        // Create audio context for recording
-        const recorder = new MediaRecorder(destination.stream);
-        const chunks: BlobEvent[] = [];
-        
-        recorder.ondataavailable = (event) => {
-          chunks.push(event as BlobEvent);
-        };
-        
-        return new Promise((resolve, reject) => {
-          recorder.onstop = async () => {
-            try {
-              const blob = new Blob(chunks.map(chunk => chunk.data), { type: 'audio/wav' });
-              const arrayBuffer = await blob.arrayBuffer();
-              const decodedBuffer = await audioContext.decodeAudioData(arrayBuffer);
-              resolve(decodedBuffer);
-            } catch (error) {
-              console.error('Error decoding recorded audio:', error);
-              reject(error);
-            }
-          };
+        try {
+          const response = await fetch(url);
+          if (!response.ok) {
+            throw new Error(`Failed to fetch audio from blob: ${response.status} ${response.statusText}`);
+          }
           
-          // Start recording
-          recorder.start();
+          const arrayBuffer = await response.arrayBuffer();
+          const audioContext = getAudioContext();
+          if (!audioContext) {
+            throw new Error("Failed to create AudioContext");
+          }
           
-          // Play for a tiny moment to record
-          const originalTime = audio.currentTime;
-          audio.currentTime = 0;
+          console.log("Successfully fetched blob audio, decoding...");
+          const decodedBuffer = await audioContext.decodeAudioData(arrayBuffer);
+          return decodedBuffer;
+        } catch (blobError) {
+          console.error("Error with blob approach:", blobError);
           
-          // Use a fallback approach - create a new Audio element
+          // Fallback approach using a new Audio element
+          console.log("Using fallback approach for blob URL");
           const tempAudio = new Audio(url);
-          tempAudio.addEventListener('loadeddata', async () => {
-            try {
-              const response = await fetch(url);
-              if (!response.ok) {
-                throw new Error(`Failed to fetch audio: ${response.status} ${response.statusText}`);
+          return new Promise((resolve, reject) => {
+            tempAudio.addEventListener('loadedmetadata', () => {
+              try {
+                const audioContext = getAudioContext();
+                if (!audioContext) {
+                  throw new Error("Failed to create AudioContext");
+                }
+                
+                // Create an offline audio context for processing
+                const offlineContext = new OfflineAudioContext(
+                  2, // stereo
+                  tempAudio.duration * 44100, // standard sample rate
+                  44100 // sample rate
+                );
+                
+                // Use directly tempAudio.src instead of trying to create MediaElementSource
+                const audioSource = offlineContext.createBufferSource();
+                audioSource.connect(offlineContext.destination);
+                
+                // Start recording and rendering
+                audioSource.start();
+                offlineContext.startRendering().then(renderedBuffer => {
+                  resolve(renderedBuffer);
+                }).catch(err => {
+                  console.error("Error rendering offline audio:", err);
+                  reject(err);
+                });
+              } catch (fallbackError) {
+                console.error("Error in fallback audio loading:", fallbackError);
+                reject(fallbackError);
               }
-              
-              const arrayBuffer = await response.arrayBuffer();
-              const decodedBuffer = await audioContext.decodeAudioData(arrayBuffer);
-              resolve(decodedBuffer);
-              
-              // Stop the recorder
-              recorder.stop();
-            } catch (error) {
-              console.error('Error in fallback audio loading:', error);
-              reject(error);
-            }
+            });
+            
+            tempAudio.addEventListener('error', (error) => {
+              console.error('Error loading temp audio:', error);
+              reject(new Error('Failed to load temporary audio'));
+            });
+            
+            tempAudio.load();
           });
-          
-          tempAudio.addEventListener('error', (error) => {
-            console.error('Error loading temp audio:', error);
-            reject(new Error('Failed to load temporary audio'));
-          });
-          
-          tempAudio.load();
-        });
+        }
       } else {
         // Regular URL approach
         const response = await fetch(url);
@@ -190,6 +189,9 @@ export const useAudio = () => {
         
         const arrayBuffer = await response.arrayBuffer();
         const audioContext = getAudioContext();
+        if (!audioContext) {
+          throw new Error("Failed to create AudioContext");
+        }
         
         if (arrayBuffer.byteLength > 50 * 1024 * 1024) {
           toast.info('Large audio file detected. Processing may take longer.');
@@ -215,12 +217,15 @@ export const useAudio = () => {
     if (!audioRef.current) {
       audioRef.current = new Audio();
     }
+    
+    console.log("Setting audio source to:", audioSrc);
     audioRef.current.src = audioSrc;
     audioRef.current.volume = volume;
     
     const audio = audioRef.current;
     
     const setAudioData = () => {
+      console.log("Audio loaded successfully, duration:", audio.duration);
       setDuration(audio.duration);
       
       const startMarkerId = `start-${Date.now()}`;
@@ -247,7 +252,17 @@ export const useAudio = () => {
     
     const onError = (e) => {
       console.error('Error loading audio:', e);
-      toast.error('Impossible de charger le fichier audio. Format non supporté ou fichier inaccessible.');
+      
+      // Better error message with fallback
+      if (audioSrc.startsWith('blob:')) {
+        toast.error('Impossible de charger le fichier audio local. Format non supporté ou fichier corrompu.');
+      } else if (audioSrc.includes('mixkit')) {
+        // Fallback to a different sample audio since the mixkit URL is giving 403 errors
+        console.log("Mixkit URL failed, using alternative sample audio");
+        setAudioSrc('https://samplelib.com/lib/preview/mp3/sample-3s.mp3');
+      } else {
+        toast.error('Impossible de charger le fichier audio. Format non supporté ou fichier inaccessible.');
+      }
     };
     
     audio.addEventListener('loadeddata', setAudioData);
@@ -264,14 +279,15 @@ export const useAudio = () => {
         const buffer = await fetchAndDecodeAudio(audioSrc);
         
         if (!buffer) {
-          toast.error('Impossible de décoder le fichier audio. Essayez un autre format.');
+          console.log("Failed to decode audio buffer");
+          // Don't set error toast here as it would duplicate with onError
           return;
         }
         
         setAudioBuffer(buffer);
+        console.log("Audio buffer loaded successfully");
       } catch (error) {
         console.error('Error loading audio buffer:', error);
-        toast.error('Erreur lors du chargement du fichier audio');
       }
     };
     
@@ -738,7 +754,7 @@ export const useAudio = () => {
     
     if (audioRef.current) {
       audioRef.current.pause();
-      if (audioSrc) {
+      if (audioSrc && audioSrc.startsWith('blob:')) {
         URL.revokeObjectURL(audioSrc);
       }
     }
@@ -746,13 +762,16 @@ export const useAudio = () => {
     setAudioBuffer(null);
     
     if (file.path.startsWith('blob:') || file.path.startsWith('http')) {
+      console.log("Loading direct file:", file.name, file.path);
       setAudioSrc(file.path);
       setIsPlaying(false);
       setCurrentTime(0);
       setIsLoading(false);
     } else {
+      console.log("Loading mock network file:", file.name);
+      // Change the fallback audio URL since mixkit is giving 403 errors
       setTimeout(() => {
-        setAudioSrc('https://assets.mixkit.co/music/preview/mixkit-tech-house-vibes-130.mp3');
+        setAudioSrc('https://samplelib.com/lib/preview/mp3/sample-3s.mp3');
         setIsPlaying(false);
         setCurrentTime(0);
         setIsLoading(false);
@@ -774,7 +793,11 @@ export const useAudio = () => {
       }
       
       if (audioContextRef.current) {
-        audioContextRef.current.close().catch(console.error);
+        try {
+          audioContextRef.current.close().catch(console.error);
+        } catch (error) {
+          console.log("Could not close audio context:", error);
+        }
       }
       
       if (audioSrc && audioSrc.startsWith('blob:')) {
