@@ -330,9 +330,16 @@ export const useAudio = () => {
         trimmedAudioBlob = await bufferToWav(trimmedBuffer);
         fileExtension = "wav";
       } else {
-        const bitrate = parseInt(currentExportFormat.split('-')[1]);
-        trimmedAudioBlob = await bufferToMp3(trimmedBuffer, bitrate);
-        fileExtension = "mp3";
+        try {
+          const bitrate = parseInt(currentExportFormat.split('-')[1]);
+          trimmedAudioBlob = await bufferToMp3(trimmedBuffer, bitrate);
+          fileExtension = "mp3";
+        } catch (error) {
+          console.error("Error creating MP3:", error);
+          toast.error("Erreur lors de la création du MP3. Export en WAV à la place.");
+          trimmedAudioBlob = await bufferToWav(trimmedBuffer);
+          fileExtension = "wav";
+        }
       }
       
       const originalName = currentAudioFile.name.replace(/\.[^/.]+$/, "");
@@ -341,7 +348,7 @@ export const useAudio = () => {
       const downloadUrl = URL.createObjectURL(trimmedAudioBlob);
       
       toast.success(`Export prêt: ${exportFileName}`, {
-        description: `Découpé de ${formatTime(startTime)} à ${formatTime(endTime)} (${currentExportFormat})`,
+        description: `Découpé de ${formatTime(startTime)} à ${formatTime(endTime)} (${fileExtension === "mp3" ? currentExportFormat : "wav"})`,
         action: {
           label: 'Télécharger',
           onClick: () => {
@@ -403,70 +410,75 @@ export const useAudio = () => {
   };
 
   const bufferToMp3 = (buffer: AudioBuffer, bitrate = 128): Promise<Blob> => {
-    return new Promise((resolve) => {
-      const sampleRate = buffer.sampleRate;
-      const numChannels = buffer.numberOfChannels;
-      
-      const mp3encoder = new lamejs.Mp3Encoder(numChannels, sampleRate, bitrate);
-      const mp3Data: Int8Array[] = [];
-      
-      const channelData: Float32Array[] = [];
-      for (let i = 0; i < numChannels; i++) {
-        channelData.push(buffer.getChannelData(i));
-      }
-      
-      const sampleBlockSize = 1152;
-      const totalSamples = buffer.length;
-      
-      for (let i = 0; i < totalSamples; i += sampleBlockSize) {
-        const leftChunk = new Int16Array(sampleBlockSize);
-        const rightChunk = numChannels > 1 ? new Int16Array(sampleBlockSize) : undefined;
+    return new Promise((resolve, reject) => {
+      try {
+        const sampleRate = buffer.sampleRate;
+        const numChannels = buffer.numberOfChannels;
         
-        for (let j = 0; j < sampleBlockSize; j++) {
-          if (i + j < totalSamples) {
-            leftChunk[j] = channelData[0][i + j] * 0x7FFF;
-            if (rightChunk && numChannels > 1) {
-              rightChunk[j] = channelData[1][i + j] * 0x7FFF;
+        const mp3encoder = new lamejs.Mp3Encoder(numChannels, sampleRate, bitrate);
+        const mp3Data: Int8Array[] = [];
+        
+        const channelData: Float32Array[] = [];
+        for (let i = 0; i < numChannels; i++) {
+          channelData.push(buffer.getChannelData(i));
+        }
+        
+        const sampleBlockSize = 1152;
+        const totalSamples = buffer.length;
+        
+        for (let i = 0; i < totalSamples; i += sampleBlockSize) {
+          const leftChunk = new Int16Array(sampleBlockSize);
+          const rightChunk = numChannels > 1 ? new Int16Array(sampleBlockSize) : undefined;
+          
+          for (let j = 0; j < sampleBlockSize; j++) {
+            if (i + j < totalSamples) {
+              leftChunk[j] = channelData[0][i + j] * 0x7FFF;
+              if (rightChunk && numChannels > 1) {
+                rightChunk[j] = channelData[1][i + j] * 0x7FFF;
+              }
+            } else {
+              leftChunk[j] = 0;
+              if (rightChunk) {
+                rightChunk[j] = 0;
+              }
             }
+          }
+          
+          let mp3buf;
+          if (numChannels === 1) {
+            mp3buf = mp3encoder.encodeBuffer(leftChunk);
           } else {
-            leftChunk[j] = 0;
-            if (rightChunk) {
-              rightChunk[j] = 0;
-            }
+            mp3buf = mp3encoder.encodeBuffer(leftChunk, rightChunk);
+          }
+          
+          if (mp3buf && mp3buf.length > 0) {
+            mp3Data.push(mp3buf);
           }
         }
         
-        let mp3buf;
-        if (numChannels === 1) {
-          mp3buf = mp3encoder.encodeBuffer(leftChunk);
-        } else {
-          mp3buf = mp3encoder.encodeBuffer(leftChunk, rightChunk);
+        const finalMp3buf = mp3encoder.flush();
+        if (finalMp3buf && finalMp3buf.length > 0) {
+          mp3Data.push(finalMp3buf);
         }
         
-        if (mp3buf && mp3buf.length > 0) {
-          mp3Data.push(mp3buf);
+        let totalLength = 0;
+        for (const data of mp3Data) {
+          totalLength += data.length;
         }
+        
+        const mergedBuffer = new Int8Array(totalLength);
+        let offset = 0;
+        for (const data of mp3Data) {
+          mergedBuffer.set(data, offset);
+          offset += data.length;
+        }
+        
+        const blob = new Blob([mergedBuffer], { type: 'audio/mp3' });
+        resolve(blob);
+      } catch (error) {
+        console.error("Error in MP3 encoding:", error);
+        reject(error);
       }
-      
-      const finalMp3buf = mp3encoder.flush();
-      if (finalMp3buf && finalMp3buf.length > 0) {
-        mp3Data.push(finalMp3buf);
-      }
-      
-      let totalLength = 0;
-      for (const data of mp3Data) {
-        totalLength += data.length;
-      }
-      
-      const mergedBuffer = new Int8Array(totalLength);
-      let offset = 0;
-      for (const data of mp3Data) {
-        mergedBuffer.set(data, offset);
-        offset += data.length;
-      }
-      
-      const blob = new Blob([mergedBuffer], { type: 'audio/mp3' });
-      resolve(blob);
     });
   };
 
@@ -532,4 +544,3 @@ export const useAudio = () => {
     formatTimeDetailed
   };
 };
-
