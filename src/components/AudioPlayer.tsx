@@ -5,12 +5,12 @@ import { Button } from "@/components/ui/button";
 import { 
   Play, 
   Pause, 
-  SkipBack, 
-  SkipForward, 
   Volume2, 
   Volume1, 
   VolumeX,
-  Music
+  Music,
+  ChevronsLeft,
+  ChevronsRight
 } from "lucide-react";
 
 interface AudioPlayerProps {
@@ -125,7 +125,7 @@ export const AudioPlayer = ({
             onClick={handleSkipBack}
             disabled={duration === 0}
           >
-            <SkipBack className="h-5 w-5" />
+            <ChevronsLeft className="h-5 w-5" />
           </Button>
           
           <Button
@@ -149,7 +149,7 @@ export const AudioPlayer = ({
             onClick={handleSkipForward}
             disabled={duration === 0}
           >
-            <SkipForward className="h-5 w-5" />
+            <ChevronsRight className="h-5 w-5" />
           </Button>
         </div>
       </div>
