@@ -22,7 +22,6 @@ export const FileBrowser = ({
   isLoading,
   onPathChange,
 }: FileBrowserProps) => {
-  const [basePath, setBasePath] = useState("\\\\server\\audioLogs");
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedHour, setSelectedHour] = useState<string | null>(null);
 
@@ -33,6 +32,7 @@ export const FileBrowser = ({
     const dateFolder = format(selectedDate, "yyyy-MM-dd");
     
     // Generate path using the base path, date folder, and optionally the hour file
+    const basePath = "\\\\server\\audioLogs";
     const fullPath = `${basePath}\\${dateFolder}${selectedHour ? `\\${selectedHour}.mp3` : ''}`;
     
     onPathChange(fullPath, selectedDate, selectedHour);
@@ -45,20 +45,6 @@ export const FileBrowser = ({
   return (
     <div className="w-full flex flex-col h-full glass-panel rounded-lg overflow-hidden animate-fade-in">
       <div className="p-4 bg-secondary/50 backdrop-blur-md border-b">
-        <h3 className="text-lg font-medium mb-4">Recherche d'Enregistrements</h3>
-        
-        <div className="flex space-x-2 mb-4">
-          <div className="relative flex-1">
-            <Input
-              value={basePath}
-              onChange={(e) => setBasePath(e.target.value)}
-              className="pl-9 bg-white/50 border-0 focus-visible:ring-1"
-              placeholder="Chemin UNC de base"
-            />
-            <Folder className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          </div>
-        </div>
-        
         <div className="space-y-4">
           <div className="space-y-2">
             <label className="text-sm font-medium flex items-center gap-2">
