@@ -34,6 +34,17 @@ export const useAudioPlayback = () => {
     }
   }, []);
 
+  useEffect(() => {
+    if (!audioRef.current) {
+      console.log("Creating new Audio element");
+      const audio = new Audio();
+      audio.volume = volume;
+      audio.preload = "auto";
+      audio.crossOrigin = "anonymous";
+      audioRef.current = audio;
+    }
+  }, [volume]);
+
   const { setupAudioEvents } = useAudioEventHandlers({
     audioRef,
     setDuration,
@@ -49,70 +60,65 @@ export const useAudioPlayback = () => {
 
   const togglePlay = useCallback(() => {
     if (!audioRef.current) {
-      console.log("No audio element available");
+      console.error("No audio element available");
+      toast.error("Audio player not initialized");
       return;
     }
     
+    console.log("Toggle play called, current state:", isPlaying ? "playing" : "paused");
+    console.log("Audio element current src:", audioRef.current.src);
+    console.log("Audio element readyState:", audioRef.current.readyState);
+    
     if (!isPlaying) {
-      console.log("Attempting to play audio", audioRef.current.src);
+      setIsBuffering(true);
       
-      if (audioRef.current.src) {
-        setIsBuffering(true);
-        
-        const ctx = getAudioContext();
-        if (ctx && ctx.state === 'suspended') {
-          ctx.resume().catch(console.error);
-        }
-        
-        audioRef.current.load();
-        
-        setTimeout(() => {
-          const playPromise = audioRef.current?.play();
-          
-          if (playPromise !== undefined) {
-            playPromise
-              .then(() => {
-                console.log("Audio playing successfully");
-                setIsPlaying(true);
-                setIsBuffering(false);
-                animationRef.current = requestAnimationFrame(animateTime);
-              })
-              .catch(error => {
-                console.error('Error playing audio:', error);
-                setIsBuffering(false);
-                
-                if (ctx && ctx.state === 'suspended') {
-                  ctx.resume()
-                    .then(() => {
-                      audioRef.current?.play()
-                        .then(() => {
-                          setIsPlaying(true);
-                          setIsBuffering(false);
-                          animationRef.current = requestAnimationFrame(animateTime);
-                        })
-                        .catch(secondError => {
-                          console.error('Second attempt to play audio failed:', secondError);
-                          toast.error('Failed to play audio. Please try again.');
-                        });
-                    })
-                    .catch(err => {
-                      console.error('Failed to resume audio context:', err);
-                      toast.error('Failed to play audio. Please try again.');
-                    });
-                } else {
-                  toast.error('Failed to play audio. Please try again.');
-                }
-              });
-          } else {
-            setIsBuffering(false);
-            toast.error('Cannot play this audio file');
-          }
-        }, 100);
-      } else {
-        console.error("No audio source available");
-        toast.error("No audio source available to play");
-        setIsBuffering(false);
+      const ctx = getAudioContext();
+      if (ctx && ctx.state === 'suspended') {
+        console.log("Resuming suspended AudioContext");
+        ctx.resume().catch(err => console.error("Failed to resume AudioContext:", err));
       }
+      
+      if (!audioRef.current.src && audioSrc) {
+        console.log("Setting audio src to:", audioSrc);
+        audioRef.current.src = audioSrc;
+        audioRef.current.load();
+      }
+      
+      setTimeout(() => {
+        console.log("Attempting to play audio after delay");
+        const playPromise = audioRef.current?.play();
+        
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => {
+              console.log("Audio playing successfully");
+              setIsPlaying(true);
+              setIsBuffering(false);
+              animationRef.current = requestAnimationFrame(animateTime);
+            })
+            .catch(error => {
+              console.error('Error playing audio:', error);
+              setIsBuffering(false);
+              
+              toast.error("Failed to play audio. Try clicking the play button again.");
+              
+              const audioCtx = getAudioContext();
+              if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume()
+                  .then(() => {
+                    console.log("AudioContext resumed, try playing again");
+                  })
+                  .catch(err => {
+                    console.error('Failed to resume audio context:', err);
+                  });
+              }
+            });
+        } else {
+          console.error("Play promise undefined");
+          setIsBuffering(false);
+          toast.error("Cannot play this audio file");
+        }
+      }, 100);
     } else {
       console.log("Pausing audio");
       audioRef.current.pause();
@@ -122,7 +128,7 @@ export const useAudioPlayback = () => {
         animationRef.current = null;
       }
     }
-  }, [isPlaying, animateTime, getAudioContext]);
+  }, [isPlaying, animateTime, getAudioContext, audioSrc]);
 
   const seek = useCallback((time: number) => {
     if (!audioRef.current) return;
@@ -168,6 +174,7 @@ export const useAudioPlayback = () => {
   useEffect(() => {
     if (!audioSrc) return;
     
+    console.log("Audio source changed to:", audioSrc);
     cleanup();
     
     if (isPlaying) {
@@ -175,26 +182,31 @@ export const useAudioPlayback = () => {
     }
     
     if (!audioRef.current) {
+      console.log("Creating new Audio element for new source");
       const audio = new Audio();
       audioRef.current = audio;
     }
     
-    audioRef.current.pause();
-    audioRef.current.currentTime = 0;
+    const audio = audioRef.current;
     
-    if (audioRef.current.src) {
-      audioRef.current.removeAttribute('src');
-      audioRef.current.load();
+    audio.pause();
+    audio.currentTime = 0;
+    
+    if (audio.src) {
+      console.log("Removing existing audio source");
+      audio.removeAttribute('src');
+      audio.load();
     }
     
-    console.log("Setting audio source to:", audioSrc);
+    console.log("Setting up new audio with source:", audioSrc);
     
-    audioRef.current.preload = "auto";
-    audioRef.current.crossOrigin = "anonymous";
-    audioRef.current.volume = volume;
+    audio.preload = "auto";
+    audio.crossOrigin = "anonymous";
+    audio.volume = volume;
     
     if (audioSrc && audioSrc !== 'synthetic-audio') {
-      audioRef.current.src = audioSrc;
+      console.log("Setting audio src attribute to:", audioSrc);
+      audio.src = audioSrc;
       
       const cleanupEvents = setupAudioEvents(audioSrc);
       
@@ -210,6 +222,7 @@ export const useAudioPlayback = () => {
         setIsBuffering(false);
       };
     } else {
+      console.log("Using synthetic audio, not setting src directly");
       setIsBuffering(false);
     }
   }, [audioSrc, volume, cleanup, isPlaying, setupAudioEvents, getAudioContext]);

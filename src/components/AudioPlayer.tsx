@@ -1,5 +1,5 @@
 
-import { useState, useCallback, memo, useEffect } from "react";
+import { useState, useCallback, memo, useEffect, useRef } from "react";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { 
@@ -44,6 +44,7 @@ export const AudioPlayer = memo(({
 }: AudioPlayerProps) => {
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
   const [playbackEnabled, setPlaybackEnabled] = useState(false);
+  const playButtonRef = useRef<HTMLButtonElement>(null);
   
   const playbackPercentage = duration > 0 ? (currentTime / duration) * 100 : 0;
   
@@ -74,11 +75,17 @@ export const AudioPlayer = memo(({
     return <Volume2 className="h-5 w-5" />;
   }, [volume]);
 
-  // Handle play/pause with improved error catching
+  // Handle play/pause with improved error handling
   const handlePlayPause = useCallback(() => {
     try {
       console.log("Play/pause button clicked");
       onPlayPause();
+      
+      // Add a focus and blur to ensure the button gets proper UI feedback
+      if (playButtonRef.current) {
+        playButtonRef.current.focus();
+        setTimeout(() => playButtonRef.current?.blur(), 100);
+      }
     } catch (error) {
       console.error("Error in play/pause handler:", error);
     }
@@ -157,6 +164,7 @@ export const AudioPlayer = memo(({
           </Button>
           
           <Button
+            ref={playButtonRef}
             variant="default"
             size="icon"
             className="rounded-full h-14 w-14 transition-all hover:scale-105 active:scale-95"
