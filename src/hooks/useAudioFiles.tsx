@@ -82,6 +82,7 @@ export const useAudioFiles = (
     setIsLoading(true);
     setCurrentAudioFile(file);
     
+    // Clean up previous audio source if it exists
     if (audioRef.current) {
       audioRef.current.pause();
       if (audioSrc && audioSrc.startsWith('blob:')) {
@@ -91,12 +92,39 @@ export const useAudioFiles = (
     
     setAudioBuffer(null);
     
+    // For local files or real URL paths (blob: or http)
     if (file.path.startsWith('blob:') || file.path.startsWith('http')) {
-      console.log("Loading direct file:", file.name, file.path);
-      setAudioSrc(file.path);
-      setIsPlaying(false);
-      setCurrentTime(0);
-      setIsLoading(false);
+      console.log("Loading local file:", file.name, file.path);
+      
+      // Create a new audio element and set its source
+      const audio = new Audio();
+      audio.src = file.path;
+      
+      // Check if the audio can be played
+      audio.addEventListener('canplaythrough', () => {
+        console.log("Audio can play through:", file.name);
+        setAudioSrc(file.path);
+        setIsPlaying(false);
+        setCurrentTime(0);
+        setIsLoading(false);
+        
+        // Set the duration for the markers
+        if (audio.duration) {
+          initializeMarkers(audio.duration);
+        }
+        
+        toast.success(`Audio file loaded: ${file.name}`);
+      }, { once: true });
+      
+      // Handle loading errors
+      audio.addEventListener('error', (e) => {
+        console.error("Error loading audio file:", e);
+        toast.error(`Couldn't load audio file: ${file.name}`);
+        setIsLoading(false);
+      }, { once: true });
+      
+      // Force load the audio
+      audio.load();
     } else {
       console.log("Loading mock network file:", file.name);
       setTimeout(() => {

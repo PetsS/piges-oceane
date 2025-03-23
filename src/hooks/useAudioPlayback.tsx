@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { useAudioContext } from './useAudioContext';
@@ -50,8 +49,10 @@ export const useAudioPlayback = () => {
     if (!audioRef.current) return;
     
     if (!isPlaying) {
+      console.log("Attempting to play audio", audioRef.current.src);
       audioRef.current.play()
         .then(() => {
+          console.log("Audio playing successfully");
           setIsPlaying(true);
           animationRef.current = requestAnimationFrame(animateTime);
         })
@@ -60,6 +61,7 @@ export const useAudioPlayback = () => {
           toast.error('Failed to play audio. Please try again.');
         });
     } else {
+      console.log("Pausing audio");
       audioRef.current.pause();
       setIsPlaying(false);
       if (animationRef.current) {
@@ -87,6 +89,20 @@ export const useAudioPlayback = () => {
   const fetchAndDecodeAudio = useCallback(async (url: string): Promise<AudioBuffer | null> => {
     try {
       console.log("Fetching audio from URL:", url);
+      
+      // For local files (blob URLs)
+      if (url.startsWith('blob:')) {
+        console.log("Processing local blob URL:", url);
+        const response = await fetch(url);
+        const arrayBuffer = await response.arrayBuffer();
+        const audioContext = getAudioContext();
+        
+        if (!audioContext) {
+          throw new Error("Failed to create AudioContext");
+        }
+        
+        return await audioContext.decodeAudioData(arrayBuffer);
+      }
       
       // Handle various URL types (sample URL, blob URL, etc.)
       if (url.includes('samplelib.com') || url.includes('sample-3s.mp3')) {
@@ -204,6 +220,7 @@ export const useAudioPlayback = () => {
     console.log("Setting audio source to:", audioSrc);
     audioRef.current.src = audioSrc;
     audioRef.current.volume = volume;
+    audioRef.current.crossOrigin = "anonymous"; // Add this to handle CORS
     
     const audio = audioRef.current;
     
@@ -291,15 +308,22 @@ export const useAudioPlayback = () => {
       if (!audioSrc) return;
       
       try {
-        const buffer = await fetchAndDecodeAudio(audioSrc);
-        
-        if (!buffer) {
-          console.log("Failed to decode audio buffer");
-          return;
+        // For blob URLs, try to fetch and decode the audio data
+        if (audioSrc.startsWith('blob:')) {
+          console.log("Loading buffer for blob URL");
+          const buffer = await fetchAndDecodeAudio(audioSrc);
+          if (buffer) {
+            console.log("Successfully decoded blob audio buffer");
+            setAudioBuffer(buffer);
+          }
+        } else {
+          // For other sources, use the existing logic
+          const buffer = await fetchAndDecodeAudio(audioSrc);
+          if (buffer) {
+            setAudioBuffer(buffer);
+            console.log("Audio buffer loaded successfully");
+          }
         }
-        
-        setAudioBuffer(buffer);
-        console.log("Audio buffer loaded successfully");
       } catch (error) {
         console.error('Error loading audio buffer:', error);
       }
