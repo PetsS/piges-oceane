@@ -1,5 +1,5 @@
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { AudioFile } from './useAudioTypes';
@@ -19,8 +19,11 @@ export const useAudioFiles = (
   const [isLoading, setIsLoading] = useState(false);
   const [currentAudioFile, setCurrentAudioFile] = useState<AudioFile | null>(null);
   const { settings } = useSettings();
+  
+  // Use ref to break circular dependency
+  const loadAudioFileRef = useRef<(file: AudioFile) => void>();
 
-  // Define loadAudioFile before using it in loadFilesFromUNC
+  // Define loadAudioFile function
   const loadAudioFile = useCallback((file: AudioFile) => {
     setIsLoading(true);
     setCurrentAudioFile(file);
@@ -113,6 +116,11 @@ export const useAudioFiles = (
     }
   }, [audioSrc, getAudioContext, setAudioSrc, setAudioBuffer, setIsPlaying, setCurrentTime, initializeMarkers, audioRef]);
 
+  // Update ref with the current loadAudioFile function
+  useEffect(() => {
+    loadAudioFileRef.current = loadAudioFile;
+  }, [loadAudioFile]);
+  
   const loadFilesFromUNC = useCallback(async (path: string, city: string, date: Date, hour: string | null) => {
     setIsLoading(true);
     
@@ -130,7 +138,10 @@ export const useAudioFiles = (
         
         setAudioFiles([mockFile]);
         
-        loadAudioFile(mockFile);
+        // Use the ref to call loadAudioFile to break circular dependency
+        if (loadAudioFileRef.current) {
+          loadAudioFileRef.current(mockFile);
+        }
       } else {
         const mockFiles: AudioFile[] = Array.from({ length: 24 }, (_, i) => {
           const hourStr = i.toString().padStart(2, '0');
@@ -148,7 +159,7 @@ export const useAudioFiles = (
       
       setIsLoading(false);
     }, 1500);
-  }, [loadAudioFile]);
+  }, []); // Remove loadAudioFile from dependencies to break circular reference
 
   // Initialize with default files on component mount
   useEffect(() => {
