@@ -1,8 +1,8 @@
-
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import type { ExportFormat } from '@/pages/Admin';
+import lamejs from 'lamejs';
 
 export interface AudioMarker {
   id: string;
@@ -169,7 +169,6 @@ export const useAudio = () => {
     
     const loadBuffer = async () => {
       try {
-        // Only try to load buffer if audio source is valid
         if (!audioSrc) {
           setAudioBuffer(null);
           return;
@@ -310,7 +309,6 @@ export const useAudio = () => {
         trimmedBuffer.copyToChannel(channelData, channel);
       }
       
-      // Get export format from local storage
       const savedSettings = localStorage.getItem("appSettings");
       let currentExportFormat = exportFormat;
       
@@ -328,19 +326,13 @@ export const useAudio = () => {
       let trimmedAudioBlob: Blob;
       let fileExtension: string;
       
-      // For this version, all exports are WAV since we don't have a proper MP3 encoder
-      trimmedAudioBlob = await bufferToWav(trimmedBuffer);
-      
       if (currentExportFormat === "wav") {
+        trimmedAudioBlob = await bufferToWav(trimmedBuffer);
         fileExtension = "wav";
       } else {
-        // In a real application, you would use a proper MP3 encoder library here
-        fileExtension = "wav";
-        const bitrateSuffix = currentExportFormat.split('-')[1] || '128k';
-        toast.info(
-          `L'export MP3 ${bitrateSuffix} n'est pas implémenté dans cette version. Le fichier a été exporté en WAV.`,
-          { duration: 5000 }
-        );
+        const bitrate = parseInt(currentExportFormat.split('-')[1]);
+        trimmedAudioBlob = await bufferToMp3(trimmedBuffer, bitrate);
+        fileExtension = "mp3";
       }
       
       const originalName = currentAudioFile.name.replace(/\.[^/.]+$/, "");
@@ -376,7 +368,6 @@ export const useAudio = () => {
       const length = buffer.length * numOfChannels * 2;
       const sampleRate = buffer.sampleRate;
       
-      // Create WAV file header
       const wavBuffer = new ArrayBuffer(44 + length);
       const view = new DataView(wavBuffer);
       
@@ -394,14 +385,12 @@ export const useAudio = () => {
       writeString(view, 36, 'data');
       view.setUint32(40, length, true);
       
-      // Write audio data
       const offset = 44;
       let pos = offset;
       
       for (let i = 0; i < buffer.length; i++) {
         for (let channel = 0; channel < numOfChannels; channel++) {
           const sample = buffer.getChannelData(channel)[i];
-          // Convert float to 16-bit PCM
           const int = Math.max(-1, Math.min(1, sample)) * 0x7FFF;
           view.setInt16(pos, int, true);
           pos += 2;
@@ -409,6 +398,74 @@ export const useAudio = () => {
       }
       
       const blob = new Blob([wavBuffer], { type: 'audio/wav' });
+      resolve(blob);
+    });
+  };
+
+  const bufferToMp3 = (buffer: AudioBuffer, bitrate = 128): Promise<Blob> => {
+    return new Promise((resolve) => {
+      const sampleRate = buffer.sampleRate;
+      const numChannels = buffer.numberOfChannels;
+      
+      const mp3encoder = new lamejs.Mp3Encoder(numChannels, sampleRate, bitrate);
+      const mp3Data: Int8Array[] = [];
+      
+      const channelData: Float32Array[] = [];
+      for (let i = 0; i < numChannels; i++) {
+        channelData.push(buffer.getChannelData(i));
+      }
+      
+      const sampleBlockSize = 1152;
+      const totalSamples = buffer.length;
+      
+      for (let i = 0; i < totalSamples; i += sampleBlockSize) {
+        const leftChunk = new Int16Array(sampleBlockSize);
+        const rightChunk = numChannels > 1 ? new Int16Array(sampleBlockSize) : undefined;
+        
+        for (let j = 0; j < sampleBlockSize; j++) {
+          if (i + j < totalSamples) {
+            leftChunk[j] = channelData[0][i + j] * 0x7FFF;
+            if (rightChunk && numChannels > 1) {
+              rightChunk[j] = channelData[1][i + j] * 0x7FFF;
+            }
+          } else {
+            leftChunk[j] = 0;
+            if (rightChunk) {
+              rightChunk[j] = 0;
+            }
+          }
+        }
+        
+        let mp3buf;
+        if (numChannels === 1) {
+          mp3buf = mp3encoder.encodeBuffer(leftChunk);
+        } else {
+          mp3buf = mp3encoder.encodeBuffer(leftChunk, rightChunk);
+        }
+        
+        if (mp3buf && mp3buf.length > 0) {
+          mp3Data.push(mp3buf);
+        }
+      }
+      
+      const finalMp3buf = mp3encoder.flush();
+      if (finalMp3buf && finalMp3buf.length > 0) {
+        mp3Data.push(finalMp3buf);
+      }
+      
+      let totalLength = 0;
+      for (const data of mp3Data) {
+        totalLength += data.length;
+      }
+      
+      const mergedBuffer = new Int8Array(totalLength);
+      let offset = 0;
+      for (const data of mp3Data) {
+        mergedBuffer.set(data, offset);
+        offset += data.length;
+      }
+      
+      const blob = new Blob([mergedBuffer], { type: 'audio/mp3' });
       resolve(blob);
     });
   };
@@ -429,9 +486,7 @@ export const useAudio = () => {
       setCurrentTime(0);
       setIsLoading(false);
     } else {
-      // For network paths, load a sample audio instead
       setTimeout(() => {
-        // Use a reliable sample audio file that we know works
         setAudioSrc('https://audio-samples.github.io/samples/mp3/blizzard_biased/blizzard_01.mp3');
         setIsPlaying(false);
         setCurrentTime(0);
@@ -477,3 +532,4 @@ export const useAudio = () => {
     formatTimeDetailed
   };
 };
+
