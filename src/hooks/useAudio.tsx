@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -73,7 +72,6 @@ export const useAudio = () => {
     const currentHour = today.getHours().toString().padStart(2, '0');
     const defaultCity = 'paris';
     
-    // Load from saved settings if available
     const savedSettings = localStorage.getItem("appSettings");
     let audioFolderPath = `\\\\server\\audioLogs`;
     
@@ -105,7 +103,6 @@ export const useAudio = () => {
     const setAudioData = () => {
       setDuration(audio.duration);
       
-      // Set default markers at the beginning and end of the file
       const startMarkerId = `start-${Date.now()}`;
       const endMarkerId = `end-${Date.now() + 1}`;
       
@@ -128,9 +125,15 @@ export const useAudio = () => {
       }
     };
     
+    const onError = (e) => {
+      console.error('Error loading audio:', e);
+      toast.error('Impossible de charger le fichier audio. Format non supporté ou fichier inaccessible.');
+    };
+    
     audio.addEventListener('loadeddata', setAudioData);
     audio.addEventListener('timeupdate', setAudioTime);
     audio.addEventListener('ended', onEnded);
+    audio.addEventListener('error', onError);
     
     audio.volume = volume;
     
@@ -138,6 +141,7 @@ export const useAudio = () => {
       audio.removeEventListener('loadeddata', setAudioData);
       audio.removeEventListener('timeupdate', setAudioTime);
       audio.removeEventListener('ended', onEnded);
+      audio.removeEventListener('error', onError);
     };
   }, [audioSrc, volume]);
 
@@ -205,8 +209,8 @@ export const useAudio = () => {
   };
 
   const exportTrimmedAudio = async () => {
-    if (!audioRef.current || !audioSrc) {
-      toast.error('No audio loaded');
+    if (!audioRef.current || !audioSrc || !currentAudioFile) {
+      toast.error('Aucun audio chargé');
       return;
     }
     
@@ -214,7 +218,7 @@ export const useAudio = () => {
     const endMarker = markers.find(marker => marker.type === 'end');
     
     if (!startMarker && !endMarker) {
-      toast.error('You need to set at least one marker');
+      toast.error('Vous devez définir au moins un marqueur');
       return;
     }
     
@@ -222,65 +226,55 @@ export const useAudio = () => {
     const endTime = endMarker ? endMarker.position : duration;
     
     if (startTime >= endTime) {
-      toast.error('Start marker must be before end marker');
+      toast.error('Le marqueur de début doit être avant celui de fin');
       return;
     }
     
-    toast.success('Processing audio segment...', { duration: 2000 });
+    toast.success('Traitement du segment audio...', { duration: 2000 });
     
-    const pathParts = audioSrc.split('\\');
-    const fileName = pathParts[pathParts.length - 1];
-    const dateFolder = pathParts[pathParts.length - 2] || 'audio';
-    
-    const exportFileName = `${dateFolder}_${fileName.replace('.mp3', '')}_${formatTime(startTime).replace(':', '')}-${formatTime(endTime).replace(':', '')}.mp3`;
+    const originalName = currentAudioFile.name.replace(/\.[^/.]+$/, "");
+    const exportFileName = `${originalName}_${formatTime(startTime).replace(':', '')}-${formatTime(endTime).replace(':', '')}.mp3`;
     
     setTimeout(() => {
-      const mockDownloadUrl = audioSrc;
+      const downloadUrl = audioSrc;
       
-      toast.success(`Export ready: ${exportFileName}`, {
-        description: `Trimmed from ${formatTime(startTime)} to ${formatTime(endTime)}`,
+      toast.success(`Export prêt: ${exportFileName}`, {
+        description: `Découpé de ${formatTime(startTime)} à ${formatTime(endTime)}`,
         action: {
-          label: 'Download',
-          onClick: () => window.open(mockDownloadUrl, '_blank')
+          label: 'Télécharger',
+          onClick: () => {
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = exportFileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+          }
         },
         duration: 5000
       });
-    }, 3000);
+    }, 2000);
   };
 
   const loadAudioFile = (file: AudioFile) => {
     setIsLoading(true);
     setCurrentAudioFile(file);
     
-    setTimeout(() => {
-      // For local file paths, convert backslashes to forward slashes and use the file:// protocol
-      let audioPath = file.path;
-      
-      // Check if it's a local path rather than a network path
-      if (!audioPath.startsWith('http') && !audioPath.startsWith('https')) {
-        // Fix file path format for HTML5 Audio element
-        audioPath = audioPath.replace(/\\/g, '/');
-        
-        // If not already prefixed with file://, add it for local files
-        if (!audioPath.startsWith('file://')) {
-          audioPath = `file:///${audioPath}`;
-        }
-        
-        // For testing purposes, fall back to a sample audio URL if local file access fails
-        setAudioSrc('https://audio-samples.github.io/samples/mp3/blizzard_biased/blizzard_01.mp3');
-        
-        toast.info("Remarque: L'accès aux fichiers locaux peut être limité par les restrictions du navigateur. Si l'audio ne se charge pas, vérifiez que le chemin est correct et accessible.");
-      } else {
-        setAudioSrc(audioPath);
-      }
-      
-      // Markers will be set in the setAudioData function when the audio loads
+    if (file.path.startsWith('blob:') || file.path.startsWith('http')) {
+      setAudioSrc(file.path);
       setIsPlaying(false);
       setCurrentTime(0);
       setIsLoading(false);
-      
-      toast.success(`Chargé: ${file.name}`);
-    }, 1500);
+    } else {
+      setTimeout(() => {
+        setAudioSrc('https://audio-samples.github.io/samples/mp3/blizzard_biased/blizzard_01.mp3');
+        setIsPlaying(false);
+        setCurrentTime(0);
+        setIsLoading(false);
+        
+        toast.info("Remarque: L'accès aux fichiers réseau est simulé. Un fichier de test est chargé à la place.");
+      }, 1500);
+    }
   };
 
   const formatTime = (time: number) => {
