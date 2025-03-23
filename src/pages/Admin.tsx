@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,11 @@ interface User {
   isAdmin: boolean;
 }
 
+interface CityFolder {
+  displayName: string;
+  folderName: string;
+}
+
 interface Settings {
   headerTitle: string;
   buttonColors: {
@@ -34,7 +40,7 @@ interface Settings {
     accent: string;
   };
   audioFolderPath: string;
-  cities: string[];
+  cities: string[] | CityFolder[];
 }
 
 const Admin = () => {
@@ -49,14 +55,32 @@ const Admin = () => {
       accent: "hsl(210, 40%, 96%)",
     },
     audioFolderPath: "\\\\server\\audioLogs",
-    cities: ["paris", "lyon", "marseille", "bordeaux"]
+    cities: [
+      { displayName: "Paris", folderName: "paris" },
+      { displayName: "Lyon", folderName: "lyon" },
+      { displayName: "Marseille", folderName: "marseille" },
+      { displayName: "Bordeaux", folderName: "bordeaux" }
+    ]
   });
   
-  const [newCity, setNewCity] = useState("");
+  const [newCityDisplayName, setNewCityDisplayName] = useState("");
+  const [newCityFolderName, setNewCityFolderName] = useState("");
+  const [editingCity, setEditingCity] = useState<CityFolder | null>(null);
   
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+
+  // Migrate old format if needed
+  const migrateOldCityFormat = (cities: any[]): CityFolder[] => {
+    if (cities.length > 0 && typeof cities[0] === 'string') {
+      return cities.map(city => ({
+        displayName: city.charAt(0).toUpperCase() + city.slice(1),
+        folderName: city
+      }));
+    }
+    return cities as CityFolder[];
+  };
 
   useEffect(() => {
     const currentUser = localStorage.getItem("currentUser");
@@ -88,9 +112,20 @@ const Admin = () => {
     if (savedSettings) {
       try {
         const parsedSettings = JSON.parse(savedSettings);
+        
+        // Make sure cities exist and are in the right format
         if (!parsedSettings.cities || !Array.isArray(parsedSettings.cities)) {
-          parsedSettings.cities = ["paris", "lyon", "marseille", "bordeaux"];
+          parsedSettings.cities = [
+            { displayName: "Paris", folderName: "paris" },
+            { displayName: "Lyon", folderName: "lyon" },
+            { displayName: "Marseille", folderName: "marseille" },
+            { displayName: "Bordeaux", folderName: "bordeaux" }
+          ];
+        } else {
+          // Migrate from old format if needed
+          parsedSettings.cities = migrateOldCityFormat(parsedSettings.cities);
         }
+        
         setSettings(parsedSettings);
       } catch (error) {
         console.error("Error parsing settings from localStorage:", error);
@@ -176,33 +211,77 @@ const Admin = () => {
   };
 
   const handleAddCity = () => {
-    if (!newCity.trim()) {
-      toast.error("Veuillez entrer un nom de ville");
+    if (!newCityDisplayName.trim() || !newCityFolderName.trim()) {
+      toast.error("Veuillez remplir tous les champs");
       return;
     }
     
-    const cityLower = newCity.trim().toLowerCase();
+    const folderNameLower = newCityFolderName.trim().toLowerCase();
+    const cities = settings.cities as CityFolder[];
     
-    if (settings.cities.includes(cityLower)) {
-      toast.error("Cette ville existe déjà dans la liste");
+    if (cities.some(city => city.folderName === folderNameLower)) {
+      toast.error("Ce nom de dossier existe déjà dans la liste");
       return;
     }
     
-    const updatedCities = [...settings.cities, cityLower];
+    const updatedCities = [...cities, { 
+      displayName: newCityDisplayName.trim(), 
+      folderName: folderNameLower 
+    }];
+    
     setSettings({...settings, cities: updatedCities});
-    setNewCity("");
-    toast.success(`Ville "${newCity}" ajoutée à la liste`);
+    setNewCityDisplayName("");
+    setNewCityFolderName("");
+    toast.success(`Ville "${newCityDisplayName}" ajoutée à la liste`);
   };
 
-  const handleRemoveCity = (city: string) => {
-    if (settings.cities.length <= 1) {
+  const handleRemoveCity = (folderName: string) => {
+    const cities = settings.cities as CityFolder[];
+    if (cities.length <= 1) {
       toast.error("Vous devez garder au moins une ville dans la liste");
       return;
     }
     
-    const updatedCities = settings.cities.filter(c => c !== city);
+    const updatedCities = cities.filter(city => city.folderName !== folderName);
     setSettings({...settings, cities: updatedCities});
-    toast.success(`Ville "${city}" supprimée de la liste`);
+    toast.success(`Ville supprimée de la liste`);
+  };
+
+  const handleUpdateCity = () => {
+    if (!editingCity) return;
+    
+    if (!editingCity.displayName.trim() || !editingCity.folderName.trim()) {
+      toast.error("Veuillez remplir tous les champs");
+      return;
+    }
+    
+    const cities = settings.cities as CityFolder[];
+    const folderNameLower = editingCity.folderName.trim().toLowerCase();
+    
+    // Check if another city uses the same folder name
+    const duplicateFolder = cities.some(
+      city => city.folderName !== editingCity.folderName && 
+              city.folderName === folderNameLower
+    );
+    
+    if (duplicateFolder) {
+      toast.error("Ce nom de dossier existe déjà pour une autre ville");
+      return;
+    }
+    
+    const updatedCities = cities.map(city => {
+      if (city.folderName === editingCity.folderName) {
+        return {
+          displayName: editingCity.displayName.trim(),
+          folderName: folderNameLower
+        };
+      }
+      return city;
+    });
+    
+    setSettings({...settings, cities: updatedCities});
+    setEditingCity(null);
+    toast.success("Ville modifiée avec succès");
   };
 
   const colorToHsl = (color: string) => {
@@ -548,19 +627,28 @@ const Admin = () => {
             <CardHeader>
               <CardTitle>Gestion des villes</CardTitle>
               <CardDescription>
-                Configurez les noms des villes correspondant aux dossiers de fichiers audio
+                Configurez les noms des villes et leurs dossiers correspondants pour les fichiers audio
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                   <div className="space-y-2">
-                    <Label htmlFor="new-city">Ajouter une nouvelle ville</Label>
+                    <Label htmlFor="new-city-display">Nom d'affichage</Label>
                     <Input 
-                      id="new-city"
-                      value={newCity}
-                      onChange={(e) => setNewCity(e.target.value)}
-                      placeholder="Nom de la ville"
+                      id="new-city-display"
+                      value={newCityDisplayName}
+                      onChange={(e) => setNewCityDisplayName(e.target.value)}
+                      placeholder="Ex: Paris (sera affiché dans l'interface)"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="new-city-folder">Nom du dossier</Label>
+                    <Input 
+                      id="new-city-folder"
+                      value={newCityFolderName}
+                      onChange={(e) => setNewCityFolderName(e.target.value)}
+                      placeholder="Ex: paris (nom du dossier réel)"
                     />
                   </div>
                   <div className="pt-8">
@@ -573,26 +661,87 @@ const Admin = () => {
                 <div className="space-y-2">
                   <h3 className="text-lg font-medium">Villes disponibles</h3>
                   <div className="border rounded-md divide-y">
-                    {settings.cities && settings.cities.length > 0 ? settings.cities.map((city) => (
-                      <div key={city} className="p-4 flex justify-between items-center">
-                        <div>
-                          <p className="font-medium">{city.charAt(0).toUpperCase() + city.slice(1)}</p>
+                    {settings.cities && Array.isArray(settings.cities) && settings.cities.length > 0 ? 
+                      (settings.cities as CityFolder[]).map((city) => (
+                        <div key={city.folderName} className="p-4 flex justify-between items-center">
+                          <div>
+                            <p className="font-medium">{city.displayName}</p>
+                            <p className="text-sm text-muted-foreground">
+                              Dossier: {city.folderName}
+                            </p>
+                          </div>
+                          <div className="flex space-x-2">
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => setEditingCity({...city})}
+                                >
+                                  Modifier
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="sm:max-w-[425px]">
+                                <DialogHeader>
+                                  <DialogTitle>Modifier la ville</DialogTitle>
+                                  <DialogDescription>
+                                    Modifier le nom d'affichage et le nom du dossier
+                                  </DialogDescription>
+                                </DialogHeader>
+                                {editingCity && (
+                                  <div className="grid gap-4 py-4">
+                                    <div className="space-y-2">
+                                      <Label htmlFor="edit-city-display">Nom d'affichage</Label>
+                                      <Input
+                                        id="edit-city-display"
+                                        value={editingCity.displayName}
+                                        onChange={(e) => setEditingCity({
+                                          ...editingCity,
+                                          displayName: e.target.value
+                                        })}
+                                        placeholder="Nom affiché dans l'interface"
+                                      />
+                                    </div>
+                                    <div className="space-y-2">
+                                      <Label htmlFor="edit-city-folder">Nom du dossier</Label>
+                                      <Input
+                                        id="edit-city-folder"
+                                        value={editingCity.folderName}
+                                        onChange={(e) => setEditingCity({
+                                          ...editingCity,
+                                          folderName: e.target.value
+                                        })}
+                                        placeholder="Nom du dossier réel"
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+                                <DialogFooter>
+                                  <DialogClose asChild>
+                                    <Button variant="outline">Annuler</Button>
+                                  </DialogClose>
+                                  <DialogClose asChild>
+                                    <Button onClick={handleUpdateCity}>Enregistrer</Button>
+                                  </DialogClose>
+                                </DialogFooter>
+                              </DialogContent>
+                            </Dialog>
+                            
+                            <Button 
+                              variant="destructive" 
+                              size="sm"
+                              onClick={() => handleRemoveCity(city.folderName)}
+                            >
+                              Supprimer
+                            </Button>
+                          </div>
                         </div>
-                        <div className="flex space-x-2">
-                          <Button 
-                            variant="destructive" 
-                            size="sm"
-                            onClick={() => handleRemoveCity(city)}
-                          >
-                            Supprimer
-                          </Button>
+                      )) : (
+                        <div className="p-4 text-center text-muted-foreground">
+                          Aucune ville configurée
                         </div>
-                      </div>
-                    )) : (
-                      <div className="p-4 text-center text-muted-foreground">
-                        Aucune ville configurée
-                      </div>
-                    )}
+                      )
+                    }
                   </div>
                 </div>
                 

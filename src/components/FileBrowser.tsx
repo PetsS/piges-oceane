@@ -16,6 +16,11 @@ import {
   SelectValue
 } from "@/components/ui/select";
 
+interface CityFolder {
+  displayName: string;
+  folderName: string;
+}
+
 interface FileBrowserProps {
   files: AudioFile[];
   onFileSelect: (file: AudioFile) => void;
@@ -32,20 +37,44 @@ export const FileBrowser = ({
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedHour, setSelectedHour] = useState<string | null>(null);
   const [audioFolderPath, setAudioFolderPath] = useState("\\\\server\\audioLogs");
-  const [selectedCity, setSelectedCity] = useState<string>("paris");
-  const [availableCities, setAvailableCities] = useState<string[]>(["paris", "lyon", "marseille", "bordeaux"]);
+  const [selectedCityFolder, setSelectedCityFolder] = useState<string>("paris");
+  const [cities, setCities] = useState<CityFolder[]>([
+    { displayName: "Paris", folderName: "paris" },
+    { displayName: "Lyon", folderName: "lyon" },
+    { displayName: "Marseille", folderName: "marseille" },
+    { displayName: "Bordeaux", folderName: "bordeaux" }
+  ]);
 
   // Load audio folder path and cities from settings
   useEffect(() => {
     const savedSettings = localStorage.getItem("appSettings");
     if (savedSettings) {
-      const settings = JSON.parse(savedSettings);
-      if (settings.audioFolderPath) {
-        setAudioFolderPath(settings.audioFolderPath);
-      }
-      if (settings.cities && Array.isArray(settings.cities) && settings.cities.length > 0) {
-        setAvailableCities(settings.cities);
-        setSelectedCity(settings.cities[0]);
+      try {
+        const settings = JSON.parse(savedSettings);
+        if (settings.audioFolderPath) {
+          setAudioFolderPath(settings.audioFolderPath);
+        }
+        
+        if (settings.cities && Array.isArray(settings.cities)) {
+          // Handle both old and new format
+          if (settings.cities.length > 0) {
+            if (typeof settings.cities[0] === 'string') {
+              // Old format - convert to new format
+              const convertedCities = settings.cities.map((city: string) => ({
+                displayName: city.charAt(0).toUpperCase() + city.slice(1),
+                folderName: city
+              }));
+              setCities(convertedCities);
+              setSelectedCityFolder(settings.cities[0]);
+            } else {
+              // New format
+              setCities(settings.cities);
+              setSelectedCityFolder(settings.cities[0]?.folderName || "paris");
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error parsing settings:", error);
       }
     }
   }, []);
@@ -57,9 +86,9 @@ export const FileBrowser = ({
     const dateFolder = format(selectedDate, "yyyy-MM-dd");
     
     // Generate path using the base path, city folder, date folder, and optionally the hour file
-    const fullPath = `${audioFolderPath}\\${selectedCity}\\${dateFolder}${selectedHour ? `\\${selectedHour}.mp3` : ''}`;
+    const fullPath = `${audioFolderPath}\\${selectedCityFolder}\\${dateFolder}${selectedHour ? `\\${selectedHour}.mp3` : ''}`;
     
-    onPathChange(fullPath, selectedCity, selectedDate, selectedHour);
+    onPathChange(fullPath, selectedCityFolder, selectedDate, selectedHour);
   };
 
   const hours = Array.from({ length: 24 }, (_, i) => 
@@ -76,16 +105,16 @@ export const FileBrowser = ({
               <span>Sélectionner une ville</span>
             </label>
             <Select 
-              value={selectedCity} 
-              onValueChange={setSelectedCity}
+              value={selectedCityFolder} 
+              onValueChange={setSelectedCityFolder}
             >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Sélectionner une ville" />
               </SelectTrigger>
               <SelectContent>
-                {availableCities.map((city) => (
-                  <SelectItem key={city} value={city}>
-                    {city.charAt(0).toUpperCase() + city.slice(1)}
+                {cities.map((city) => (
+                  <SelectItem key={city.folderName} value={city.folderName}>
+                    {city.displayName}
                   </SelectItem>
                 ))}
               </SelectContent>
