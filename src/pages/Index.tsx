@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { AudioPlayer } from "@/components/AudioPlayer";
@@ -168,7 +167,7 @@ const Index = () => {
             />
           </div>
 
-          <div className="h-fit grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="h-fit">
             <MarkerControls
               markers={markers}
               onAddMarker={addMarker}
@@ -176,17 +175,6 @@ const Index = () => {
               currentTime={currentTime}
               formatTimeDetailed={formatTimeDetailed}
             />
-
-            <div className="flex items-end justify-end">
-              <Button
-                onClick={exportTrimmedAudio}
-                disabled={duration === 0}
-                size="lg"
-                className="w-full md:w-auto"
-              >
-                Exporter l'audio
-              </Button>
-            </div>
           </div>
         </div>
       </div>
@@ -195,3 +183,4 @@ const Index = () => {
 };
 
 export default Index;
+
