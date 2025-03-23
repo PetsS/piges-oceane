@@ -79,13 +79,17 @@ export const AudioPlayer = memo(({
   const handlePlayPause = useCallback(() => {
     try {
       console.log("Play/pause button clicked");
-      onPlayPause();
       
-      // Add a focus and blur to ensure the button gets proper UI feedback
+      // Focus the button to trigger any potential user interaction handlers
       if (playButtonRef.current) {
         playButtonRef.current.focus();
-        setTimeout(() => playButtonRef.current?.blur(), 100);
       }
+      
+      // Call the provided play/pause handler
+      onPlayPause();
+      
+      // Add visual feedback
+      setTimeout(() => playButtonRef.current?.blur(), 100);
     } catch (error) {
       console.error("Error in play/pause handler:", error);
     }
@@ -170,6 +174,7 @@ export const AudioPlayer = memo(({
             className="rounded-full h-14 w-14 transition-all hover:scale-105 active:scale-95"
             onClick={handlePlayPause}
             disabled={!playbackEnabled || isLoading}
+            aria-label={isPlaying ? "Pause" : "Play"}
           >
             {isBuffering ? (
               <Loader2 className="h-6 w-6 animate-spin" />

@@ -1,5 +1,5 @@
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useAudioContext } from './useAudioContext';
 import { useAudioFormatting } from './useAudioFormatting';
@@ -20,17 +20,30 @@ export const useAudio = () => {
   const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
   const [markers, setMarkers] = useState<AudioMarker[]>([]);
   const [isBuffering, setIsBuffering] = useState(false);
+  const [showMarkerControls, setShowMarkerControls] = useState(false);
   
   // Create refs
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const processingRef = useRef<boolean>(false);
   
   // Initialize context and utils
-  const { getAudioContext } = useAudioContext();
+  const { getAudioContext, isContextReady } = useAudioContext();
   const { formatTime, formatTimeDetailed } = useAudioFormatting();
   
   // Initialize playback controls with partial dependencies to avoid circular dependencies
   const playback = useAudioPlayback();
+  
+  // Initialize audio element if it doesn't exist
+  useEffect(() => {
+    if (!audioRef.current) {
+      console.log("Creating new Audio element in useAudio");
+      const audio = new Audio();
+      audio.volume = volume;
+      audio.preload = "auto";
+      audio.crossOrigin = "anonymous";
+      audioRef.current = audio;
+    }
+  }, [volume]);
   
   // Initialize files management
   const { 
@@ -99,23 +112,67 @@ export const useAudio = () => {
     setMarkers(markers.filter(marker => marker.id !== id));
   };
   
-  // Toggle play/pause
+  // Toggle play/pause with direct HTMLAudioElement usage
   const togglePlay = () => {
-    if (!audioRef.current) return;
+    if (!audioRef.current) {
+      console.error("No audio element available");
+      return;
+    }
+    
+    // First ensure AudioContext is running
+    const ctx = getAudioContext();
+    if (ctx && ctx.state === 'suspended') {
+      console.log("Resuming suspended AudioContext before playback");
+      ctx.resume().catch(err => console.error("Failed to resume AudioContext:", err));
+    }
+    
+    console.log("Toggle play called, current state:", isPlaying ? "playing" : "paused");
+    console.log("Audio element readyState:", audioRef.current.readyState);
     
     if (!isPlaying) {
       setIsBuffering(true);
-      audioRef.current.play()
-        .then(() => {
-          setIsPlaying(true);
+      
+      // Ensure source is set
+      if (!audioRef.current.src && audioSrc) {
+        console.log("Setting audio src to:", audioSrc);
+        audioRef.current.src = audioSrc;
+        audioRef.current.load();
+      }
+      
+      // Small delay to ensure UI updates and any browser policies are satisfied
+      setTimeout(() => {
+        if (!audioRef.current) return;
+        
+        console.log("Attempting to play audio");
+        const playPromise = audioRef.current.play();
+        
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => {
+              console.log("Audio playing successfully");
+              setIsPlaying(true);
+              setIsBuffering(false);
+            })
+            .catch(error => {
+              console.error('Error playing audio:', error);
+              setIsBuffering(false);
+              toast.error("Failed to play audio. Please try again.");
+              
+              // Try resuming the context again on error
+              const audioCtx = getAudioContext();
+              if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume().catch(err => {
+                  console.error('Failed to resume audio context:', err);
+                });
+              }
+            });
+        } else {
+          console.error("Play promise undefined");
           setIsBuffering(false);
-        })
-        .catch(error => {
-          console.error('Error playing audio:', error);
-          setIsBuffering(false);
-          toast.error('Failed to play audio. Please try again.');
-        });
+        }
+      }, 100);
     } else {
+      console.log("Pausing audio");
       audioRef.current.pause();
       setIsPlaying(false);
     }
@@ -142,6 +199,63 @@ export const useAudio = () => {
     setVolume(newVolume);
   };
   
+  // Update time display from audio element
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    
+    const timeUpdateHandler = () => {
+      setCurrentTime(audio.currentTime);
+    };
+    
+    const loadedDataHandler = () => {
+      setDuration(audio.duration);
+      setIsBuffering(false);
+    };
+    
+    const playHandler = () => {
+      console.log("Audio play event triggered");
+      setIsPlaying(true);
+      setIsBuffering(false);
+    };
+    
+    const pauseHandler = () => {
+      console.log("Audio pause event triggered");
+      setIsPlaying(false);
+    };
+    
+    const endedHandler = () => {
+      console.log("Audio ended event triggered");
+      setIsPlaying(false);
+      setCurrentTime(0);
+    };
+    
+    const errorHandler = (e) => {
+      console.error("Audio error:", e);
+      setIsBuffering(false);
+      setIsPlaying(false);
+      toast.error("Error playing audio");
+    };
+    
+    // Add event listeners
+    audio.addEventListener('timeupdate', timeUpdateHandler);
+    audio.addEventListener('loadeddata', loadedDataHandler);
+    audio.addEventListener('play', playHandler);
+    audio.addEventListener('pause', pauseHandler);
+    audio.addEventListener('ended', endedHandler);
+    audio.addEventListener('error', errorHandler);
+    
+    // Clean up
+    return () => {
+      audio.removeEventListener('timeupdate', timeUpdateHandler);
+      audio.removeEventListener('loadeddata', loadedDataHandler);
+      audio.removeEventListener('play', playHandler);
+      audio.removeEventListener('pause', pauseHandler);
+      audio.removeEventListener('ended', endedHandler);
+      audio.removeEventListener('error', errorHandler);
+    };
+  }, []);
+  
   return {
     audioSrc,
     isPlaying,
@@ -153,6 +267,8 @@ export const useAudio = () => {
     isLoading,
     currentAudioFile,
     isBuffering,
+    showMarkerControls,
+    setShowMarkerControls,
     togglePlay,
     seek,
     changeVolume,

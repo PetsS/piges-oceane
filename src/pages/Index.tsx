@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { AudioPlayer } from "@/components/AudioPlayer";
@@ -65,7 +66,6 @@ const colorToHsl = (color: string) => {
 const Index = () => {
   const [showAdmin, setShowAdmin] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
-  const [showMarkerControls, setShowMarkerControls] = useState(false);
   const navigate = useNavigate();
   const {
     audioFiles,
@@ -87,6 +87,8 @@ const Index = () => {
     changeVolume,
     currentAudioFile,
     isBuffering,
+    showMarkerControls,
+    setShowMarkerControls
   } = useAudio();
 
   useEffect(() => {

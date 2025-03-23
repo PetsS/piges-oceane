@@ -1,8 +1,9 @@
 
-import { useRef, useCallback, useEffect } from 'react';
+import { useRef, useCallback, useEffect, useState } from 'react';
 
 export const useAudioContext = () => {
   const audioContextRef = useRef<AudioContext | null>(null);
+  const [isContextReady, setIsContextReady] = useState(false);
   
   const getAudioContext = useCallback(() => {
     if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
@@ -19,13 +20,29 @@ export const useAudioContext = () => {
         if (audioContextRef.current.state === 'suspended') {
           console.log("New AudioContext is suspended, attempting to resume");
           audioContextRef.current.resume()
-            .then(() => console.log("Successfully resumed new AudioContext"))
+            .then(() => {
+              console.log("Successfully resumed new AudioContext");
+              setIsContextReady(true);
+            })
             .catch(err => console.error("Failed to resume new AudioContext:", err));
+        } else {
+          setIsContextReady(true);
         }
       } catch (error) {
         console.error("Error creating AudioContext:", error);
       }
+    } else if (audioContextRef.current.state === 'suspended') {
+      // If context exists but is suspended, try to resume it
+      audioContextRef.current.resume()
+        .then(() => {
+          console.log("Resumed existing AudioContext");
+          setIsContextReady(true);
+        })
+        .catch(err => console.error("Failed to resume existing AudioContext:", err));
+    } else {
+      setIsContextReady(true);
     }
+    
     return audioContextRef.current;
   }, []);
   
@@ -34,7 +51,14 @@ export const useAudioContext = () => {
     const resumeAudioContext = () => {
       if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
         console.log("Resuming AudioContext on user interaction");
-        audioContextRef.current.resume().catch(console.error);
+        audioContextRef.current.resume()
+          .then(() => {
+            console.log("AudioContext resumed by user interaction");
+            setIsContextReady(true);
+          })
+          .catch(err => console.error("Failed to resume AudioContext on user interaction:", err));
+      } else {
+        setIsContextReady(true);
       }
     };
     
@@ -65,6 +89,7 @@ export const useAudioContext = () => {
   
   return {
     audioContextRef,
-    getAudioContext
+    getAudioContext,
+    isContextReady
   };
 };
