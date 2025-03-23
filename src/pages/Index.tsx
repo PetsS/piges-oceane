@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { AudioPlayer } from "@/components/AudioPlayer";
@@ -7,6 +6,59 @@ import { MarkerControls } from "@/components/MarkerControls";
 import { useAudio } from "@/hooks/useAudio";
 import { Button } from "@/components/ui/button";
 import { Cog, LogOut } from "lucide-react";
+
+const colorToHsl = (color: string) => {
+  if (color.startsWith('hsl')) {
+    const match = color.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
+    if (match) {
+      return `${match[1]} ${match[2]}% ${match[3]}%`;
+    }
+  }
+  
+  let r = 0, g = 0, b = 0;
+  
+  if (color.startsWith('#')) {
+    const hex = color.slice(1);
+    r = parseInt(hex.length === 3 ? hex[0] + hex[0] : hex.substring(0, 2), 16);
+    g = parseInt(hex.length === 3 ? hex[1] + hex[1] : hex.substring(2, 4), 16);
+    b = parseInt(hex.length === 3 ? hex[2] + hex[2] : hex.substring(4, 6), 16);
+  } 
+  else if (color.startsWith('rgb')) {
+    const match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*\d+(?:\.\d+)?)?\)/);
+    if (match) {
+      r = parseInt(match[1], 10);
+      g = parseInt(match[2], 10);
+      b = parseInt(match[3], 10);
+    }
+  }
+  
+  r /= 255;
+  g /= 255;
+  b /= 255;
+  
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  let h = 0, s = 0, l = (max + min) / 2;
+  
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    
+    switch (max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      case b: h = (r - g) / d + 4; break;
+    }
+    
+    h /= 6;
+  }
+  
+  h = Math.round(h * 360);
+  s = Math.round(s * 100);
+  l = Math.round(l * 100);
+  
+  return `${h} ${s}% ${l}%`;
+};
 
 const Index = () => {
   const [showAdmin, setShowAdmin] = useState(false);
@@ -32,23 +84,20 @@ const Index = () => {
     currentFile,
   } = useAudio();
 
-  // Check if the user is an admin
   useEffect(() => {
     const isAdmin = localStorage.getItem("isAdmin") === "true";
     setShowAdmin(isAdmin);
   }, []);
   
-  // Load settings from localStorage
   useEffect(() => {
     const savedSettings = localStorage.getItem("appSettings");
     if (savedSettings) {
       const settings = JSON.parse(savedSettings);
       
-      // Apply the CSS variables for colors
       if (settings.buttonColors) {
-        document.documentElement.style.setProperty('--primary', settings.buttonColors.primary);
-        document.documentElement.style.setProperty('--secondary', settings.buttonColors.secondary);
-        document.documentElement.style.setProperty('--accent', settings.buttonColors.accent);
+        document.documentElement.style.setProperty('--primary', colorToHsl(settings.buttonColors.primary));
+        document.documentElement.style.setProperty('--secondary', colorToHsl(settings.buttonColors.secondary));
+        document.documentElement.style.setProperty('--accent', colorToHsl(settings.buttonColors.accent));
       }
     }
   }, []);
