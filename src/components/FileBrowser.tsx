@@ -1,8 +1,8 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AudioFile } from "@/hooks/useAudio";
 import { cn } from "@/lib/utils";
-import { Calendar, Folder, Search, Clock, FileAudio } from "lucide-react";
+import { Calendar, Search, Clock, FileAudio } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -24,6 +24,18 @@ export const FileBrowser = ({
 }: FileBrowserProps) => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedHour, setSelectedHour] = useState<string | null>(null);
+  const [audioFolderPath, setAudioFolderPath] = useState("\\\\server\\audioLogs");
+
+  // Load audio folder path from settings
+  useEffect(() => {
+    const savedSettings = localStorage.getItem("appSettings");
+    if (savedSettings) {
+      const settings = JSON.parse(savedSettings);
+      if (settings.audioFolderPath) {
+        setAudioFolderPath(settings.audioFolderPath);
+      }
+    }
+  }, []);
 
   const handleSearch = () => {
     if (!selectedDate) return;
@@ -32,8 +44,7 @@ export const FileBrowser = ({
     const dateFolder = format(selectedDate, "yyyy-MM-dd");
     
     // Generate path using the base path, date folder, and optionally the hour file
-    const basePath = "\\\\server\\audioLogs";
-    const fullPath = `${basePath}\\${dateFolder}${selectedHour ? `\\${selectedHour}.mp3` : ''}`;
+    const fullPath = `${audioFolderPath}\\${dateFolder}${selectedHour ? `\\${selectedHour}.mp3` : ''}`;
     
     onPathChange(fullPath, selectedDate, selectedHour);
   };

@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,15 +8,32 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 
-// Simple credentials for demo purposes - in a real app, these would be stored securely
-const VALID_USERNAME = "admin";
-const VALID_PASSWORD = "password";
+// Initialize default admin if no users exist
+const initializeDefaultUsers = () => {
+  const users = localStorage.getItem("users");
+  if (!users) {
+    const defaultUsers = [
+      { username: "admin", password: "password", isAdmin: true }
+    ];
+    localStorage.setItem("users", JSON.stringify(defaultUsers));
+  }
+};
 
 const Login = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // Initialize default admin user if needed
+    initializeDefaultUsers();
+    
+    // Check if already logged in
+    if (localStorage.getItem("isAuthenticated") === "true") {
+      navigate("/");
+    }
+  }, [navigate]);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,9 +44,16 @@ const Login = () => {
       return;
     }
 
-    if (username === VALID_USERNAME && password === VALID_PASSWORD) {
+    // Get users from localStorage
+    const users = JSON.parse(localStorage.getItem("users") || "[]");
+    const user = users.find((u: any) => u.username === username && u.password === password);
+
+    if (user) {
       // Store auth state in localStorage
       localStorage.setItem("isAuthenticated", "true");
+      localStorage.setItem("currentUser", username);
+      localStorage.setItem("isAdmin", user.isAdmin.toString());
+      
       toast.success("Connexion réussie!");
       navigate("/");
     } else {

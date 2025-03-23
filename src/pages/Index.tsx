@@ -1,122 +1,119 @@
-import { useState } from "react";
-import { useAudio } from "@/hooks/useAudio";
+
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { AudioPlayer } from "@/components/AudioPlayer";
-import { Waveform } from "@/components/Waveform";
-import { MarkerControls } from "@/components/MarkerControls";
 import { FileBrowser } from "@/components/FileBrowser";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { Separator } from "@/components/ui/separator";
+import { MarkerControls } from "@/components/MarkerControls";
+import { useAudio } from "@/hooks/useAudio";
+import { Button } from "@/components/ui/button";
+import { Cog, LogOut } from "lucide-react";
 
 const Index = () => {
+  const [showAdmin, setShowAdmin] = useState(false);
+  const navigate = useNavigate();
   const {
-    isPlaying,
-    currentTime,
-    duration,
-    volume,
-    markers,
     audioFiles,
+    currentFile,
     isLoading,
-    togglePlay,
-    seek,
-    changeVolume,
-    addMarker,
-    exportTrimmedAudio,
-    loadAudioFile,
-    loadFilesFromUNC,
-    formatTime,
-    formatTimeDetailed,
+    setMarkers,
+    markers,
+    handleFileSelect,
+    handleSearch,
+    exportAudio,
   } = useAudio();
 
-  const isMobile = useIsMobile();
-  const [selectedFile, setSelectedFile] = useState<string | null>(null);
-
-  const handleFileSelect = (file: any) => {
-    loadAudioFile(file);
-    setSelectedFile(file.name);
-  };
-
-  const handlePathChange = (path: string, date: Date, hour: string | null) => {
-    loadFilesFromUNC(path, date, hour);
+  // Check if the user is an admin
+  useEffect(() => {
+    const isAdmin = localStorage.getItem("isAdmin") === "true";
+    setShowAdmin(isAdmin);
+  }, []);
+  
+  // Load settings from localStorage
+  useEffect(() => {
+    const savedSettings = localStorage.getItem("appSettings");
+    if (savedSettings) {
+      const settings = JSON.parse(savedSettings);
+      
+      // Apply the CSS variables for colors
+      if (settings.buttonColors) {
+        document.documentElement.style.setProperty('--primary', settings.buttonColors.primary);
+        document.documentElement.style.setProperty('--secondary', settings.buttonColors.secondary);
+        document.documentElement.style.setProperty('--accent', settings.buttonColors.accent);
+      }
+    }
+  }, []);
+  
+  const handleLogout = () => {
+    localStorage.removeItem("isAuthenticated");
+    localStorage.removeItem("currentUser");
+    localStorage.removeItem("isAdmin");
+    navigate("/login");
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-secondary/30 overflow-hidden">
-      {/* Header */}
-      <header className="py-6 px-6 md:px-8 flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="w-5 h-5 text-white"
-            >
-              <path d="M9 18V5l12-2v13" />
-              <circle cx="6" cy="18" r="3" />
-              <circle cx="18" cy="16" r="3" />
-            </svg>
-          </div>
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight">Enregistreur Audio</h1>
-          </div>
+    <div className="h-screen flex flex-col overflow-hidden bg-background">
+      <header className="bg-background border-b py-4 px-6 flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold">
+            {localStorage.getItem("appSettings") ? 
+              JSON.parse(localStorage.getItem("appSettings") || '{}').headerTitle || "Lecteur Audio" : 
+              "Lecteur Audio"
+            }
+          </h1>
+        </div>
+        <div className="flex items-center gap-2">
+          {showAdmin && (
+            <Button variant="outline" size="sm" onClick={() => navigate("/admin")}>
+              <Cog className="mr-2 h-4 w-4" />
+              Administration
+            </Button>
+          )}
+          <Button variant="ghost" size="sm" onClick={handleLogout}>
+            <LogOut className="mr-2 h-4 w-4" />
+            Déconnexion
+          </Button>
         </div>
       </header>
 
-      <Separator />
+      <div className="flex-1 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6 p-6 overflow-hidden">
+        <div className="md:col-span-1 h-full overflow-hidden">
+          <FileBrowser
+            files={audioFiles}
+            onFileSelect={handleFileSelect}
+            isLoading={isLoading}
+            onPathChange={handleSearch}
+          />
+        </div>
 
-      {/* Main content */}
-      <main className="container px-4 py-6 md:py-8 max-w-7xl">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* File browser - left column on desktop, top on mobile */}
-          <div className="md:col-span-1 h-[300px] md:h-[calc(100vh-12rem)]">
-            <FileBrowser
-              files={audioFiles}
-              onFileSelect={handleFileSelect}
-              isLoading={isLoading}
-              onPathChange={handlePathChange}
+        <div className="md:col-span-2 lg:col-span-3 flex flex-col space-y-4 h-full overflow-hidden">
+          <div className="flex-1 min-h-0">
+            <AudioPlayer
+              file={currentFile}
+              markers={markers}
+              onMarkersChange={setMarkers}
             />
           </div>
 
-          {/* Audio player and waveform - center column on desktop, middle on mobile */}
-          <div className="md:col-span-2 flex flex-col space-y-6">
-            <div className="w-full">
-              <Waveform
-                currentTime={currentTime}
-                duration={duration}
-                markers={markers}
-                onSeek={seek}
-                isPlaying={isPlaying}
-              />
-            </div>
+          <div className="h-fit grid grid-cols-1 md:grid-cols-2 gap-4">
+            <MarkerControls
+              markers={markers}
+              onMarkersChange={setMarkers}
+              disabled={!currentFile}
+            />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <AudioPlayer
-                isPlaying={isPlaying}
-                currentTime={currentTime}
-                duration={duration}
-                volume={volume}
-                onPlayPause={togglePlay}
-                onVolumeChange={changeVolume}
-                onSeek={seek}
-                formatTime={formatTime}
-                audioTitle={selectedFile ? `${selectedFile} (60 min)` : "Aucun fichier sélectionné"}
-              />
-
-              <MarkerControls
-                markers={markers}
-                onAddMarker={addMarker}
-                onExport={exportTrimmedAudio}
-                currentTime={currentTime}
-                formatTimeDetailed={formatTimeDetailed}
-              />
+            <div className="flex items-end justify-end">
+              <Button
+                onClick={exportAudio}
+                disabled={!currentFile}
+                size="lg"
+                className="w-full md:w-auto"
+              >
+                Exporter l'audio
+              </Button>
             </div>
           </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 };
