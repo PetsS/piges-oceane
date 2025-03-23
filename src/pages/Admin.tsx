@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -65,6 +66,7 @@ const Admin = () => {
   const [newCityDisplayName, setNewCityDisplayName] = useState("");
   const [newCityFolderName, setNewCityFolderName] = useState("");
   const [editingCity, setEditingCity] = useState<CityFolder | null>(null);
+  const [originalFolderName, setOriginalFolderName] = useState<string>("");
   
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState("");
@@ -261,9 +263,9 @@ const Admin = () => {
     }
     
     const cities = settings.cities as CityFolder[];
-    const originalFolderName = editingCity.folderName;
     const folderNameLower = editingCity.folderName.trim().toLowerCase();
     
+    // Check if another city has the same folder name except the one we're editing
     const duplicateFolder = cities.some(
       city => city.folderName !== originalFolderName && 
               city.folderName === folderNameLower
@@ -685,7 +687,10 @@ const Admin = () => {
                                 <Button 
                                   variant="outline" 
                                   size="sm"
-                                  onClick={() => setEditingCity({...city})}
+                                  onClick={() => {
+                                    setEditingCity({...city});
+                                    setOriginalFolderName(city.folderName);
+                                  }}
                                 >
                                   Modifier
                                 </Button>
@@ -767,4 +772,3 @@ const Admin = () => {
 };
 
 export default Admin;
-
