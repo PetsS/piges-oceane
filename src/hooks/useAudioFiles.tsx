@@ -20,65 +20,7 @@ export const useAudioFiles = (
   const [currentAudioFile, setCurrentAudioFile] = useState<AudioFile | null>(null);
   const { settings } = useSettings();
 
-  const loadFilesFromUNC = useCallback(async (path: string, city: string, date: Date, hour: string | null) => {
-    setIsLoading(true);
-    
-    setTimeout(() => {
-      const dateStr = format(date, 'yyyy-MM-dd');
-      
-      if (hour) {
-        const mockFile: AudioFile = {
-          name: `${hour}.mp3`,
-          path: `${path}\\${hour}.mp3`,
-          size: '140 MB', // Updated to reflect 1-hour audio file size
-          type: 'audio/mpeg',
-          lastModified: format(date, 'yyyy-MM-dd')
-        };
-        
-        setAudioFiles([mockFile]);
-        
-        loadAudioFile(mockFile);
-      } else {
-        const mockFiles: AudioFile[] = Array.from({ length: 24 }, (_, i) => {
-          const hourStr = i.toString().padStart(2, '0');
-          return {
-            name: `${hourStr}.mp3`,
-            path: `${path}\\${hourStr}.mp3`,
-            size: `140 MB`, // Updated to consistently show 140MB for all files
-            type: 'audio/mpeg',
-            lastModified: format(date, 'yyyy-MM-dd')
-          };
-        });
-        
-        setAudioFiles(mockFiles);
-      }
-      
-      setIsLoading(false);
-    }, 1500);
-  }, [loadAudioFile]);
-
-  // Initialize with default files on component mount
-  useEffect(() => {
-    if (!settings) return;
-    
-    const today = new Date();
-    const currentHour = today.getHours().toString().padStart(2, '0');
-    
-    // Get the first city from settings or default to 'paris'
-    const defaultCity = settings.cities && settings.cities.length > 0 
-      ? settings.cities[0].folderName 
-      : 'paris';
-    
-    const audioFolderPath = settings.audioFolderPath || '\\\\server\\audioLogs';
-    
-    loadFilesFromUNC(
-      `${audioFolderPath}\\${defaultCity}\\${format(today, 'yyyy-MM-dd')}`, 
-      defaultCity, 
-      today, 
-      currentHour
-    );
-  }, [settings, loadFilesFromUNC]);
-
+  // Define loadAudioFile before using it in loadFilesFromUNC
   const loadAudioFile = useCallback((file: AudioFile) => {
     setIsLoading(true);
     setCurrentAudioFile(file);
@@ -170,6 +112,65 @@ export const useAudioFiles = (
       }, 1000);
     }
   }, [audioSrc, getAudioContext, setAudioSrc, setAudioBuffer, setIsPlaying, setCurrentTime, initializeMarkers, audioRef]);
+
+  const loadFilesFromUNC = useCallback(async (path: string, city: string, date: Date, hour: string | null) => {
+    setIsLoading(true);
+    
+    setTimeout(() => {
+      const dateStr = format(date, 'yyyy-MM-dd');
+      
+      if (hour) {
+        const mockFile: AudioFile = {
+          name: `${hour}.mp3`,
+          path: `${path}\\${hour}.mp3`,
+          size: '140 MB', // Updated to reflect 1-hour audio file size
+          type: 'audio/mpeg',
+          lastModified: format(date, 'yyyy-MM-dd')
+        };
+        
+        setAudioFiles([mockFile]);
+        
+        loadAudioFile(mockFile);
+      } else {
+        const mockFiles: AudioFile[] = Array.from({ length: 24 }, (_, i) => {
+          const hourStr = i.toString().padStart(2, '0');
+          return {
+            name: `${hourStr}.mp3`,
+            path: `${path}\\${hourStr}.mp3`,
+            size: `140 MB`, // Updated to consistently show 140MB for all files
+            type: 'audio/mpeg',
+            lastModified: format(date, 'yyyy-MM-dd')
+          };
+        });
+        
+        setAudioFiles(mockFiles);
+      }
+      
+      setIsLoading(false);
+    }, 1500);
+  }, [loadAudioFile]);
+
+  // Initialize with default files on component mount
+  useEffect(() => {
+    if (!settings) return;
+    
+    const today = new Date();
+    const currentHour = today.getHours().toString().padStart(2, '0');
+    
+    // Get the first city from settings or default to 'paris'
+    const defaultCity = settings.cities && settings.cities.length > 0 
+      ? settings.cities[0].folderName 
+      : 'paris';
+    
+    const audioFolderPath = settings.audioFolderPath || '\\\\server\\audioLogs';
+    
+    loadFilesFromUNC(
+      `${audioFolderPath}\\${defaultCity}\\${format(today, 'yyyy-MM-dd')}`, 
+      defaultCity, 
+      today, 
+      currentHour
+    );
+  }, [settings, loadFilesFromUNC]);
 
   return {
     audioFiles,
