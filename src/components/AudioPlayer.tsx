@@ -41,11 +41,11 @@ export const AudioPlayer = ({
   const playbackPercentage = duration > 0 ? (currentTime / duration) * 100 : 0;
   
   const handleSkipBack = () => {
-    onSeek(Math.max(0, currentTime - 5));
+    onSeek(Math.max(0, currentTime - 10));
   };
   
   const handleSkipForward = () => {
-    onSeek(Math.min(duration, currentTime + 5));
+    onSeek(Math.min(duration, currentTime + 10));
   };
   
   const handleVolumeIconClick = () => {
