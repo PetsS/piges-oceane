@@ -1,15 +1,22 @@
+
 export interface Settings {
   colorScheme: 'light' | 'dark' | 'auto';
   headerTitle: string;
   logoUrl: string | null;
   enableNotifications: boolean;
-  cities: { displayName: string; folderName: string; }[];
+  cities: CityFolder[];
   audioFolderPath: string;
   buttonColors: {
     primary: string;
     secondary: string;
     accent: string;
   };
+}
+
+// Define and export the CityFolder interface
+export interface CityFolder {
+  displayName: string;
+  folderName: string;
 }
 
 // Default settings
