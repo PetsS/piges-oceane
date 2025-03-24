@@ -1,4 +1,3 @@
-
 import { toast } from "sonner";
 
 export interface CityFolder {
@@ -25,9 +24,9 @@ const SETTINGS_API_URL = "http://your-api-server.com/api/settings";
 const DEFAULT_SETTINGS: Settings = {
   headerTitle: "Lecteur Audio",
   buttonColors: {
-    primary: "hsl(221, 83%, 53%)",
-    secondary: "hsl(210, 40%, 96%)",
-    accent: "hsl(210, 40%, 96%)",
+    primary: "#1F4A4F",
+    secondary: "#8F8F8F",
+    accent: "#8F8F8F",
   },
   audioFolderPath: "\\\\server\\audioLogs",
   cities: [
@@ -147,4 +146,5 @@ export const applyTheme = (settings: Settings) => {
   document.documentElement.style.setProperty('--primary', colorToHsl(settings.buttonColors.primary));
   document.documentElement.style.setProperty('--secondary', colorToHsl(settings.buttonColors.secondary));
   document.documentElement.style.setProperty('--accent', colorToHsl(settings.buttonColors.accent));
+  document.documentElement.style.setProperty('--sidebar-background', colorToHsl(settings.buttonColors.secondary));
 };
