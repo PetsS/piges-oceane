@@ -5,23 +5,84 @@
     "folderName": "01_Brest"
   },
   {
-    "displayName": "Paris",
-    "folderName": "02_Paris"
+    "displayName": "Lorient",
+    "folderName": "02_Lorient"
   },
   {
     "displayName": "Nantes",
     "folderName": "03_Nantes"
   },
   {
-    "displayName": "Lyon",
-    "folderName": "04_Lyon"
+    "displayName": "Rennes",
+    "folderName": "04_Rennes"
   },
   {
-    "displayName": "Marseille",
-    "folderName": "05_Marseille"
+    "displayName": "Saint-Brieuc",
+    "folderName": "05_ST_Brieuc"
   },
   {
-    "displayName": "Bordeaux",
-    "folderName": "06_Bordeaux"
+    "displayName": "Saint-Nazaire",
+    "folderName": "06_ST_Nazaire"
+  },
+  {
+    "displayName": "Cholet",
+    "folderName": "07_Cholet"
+  },
+  {
+    "displayName": "Vannes",
+    "folderName": "08_Vannes"
+  },
+  {
+    "displayName": "Quimper",
+    "folderName": "09_Quimper"
+  },
+  {
+    "displayName": "Laval",
+    "folderName": "10_Laval"
+  },
+  {
+    "displayName": "La Roche sur Yon",
+    "folderName": "11_LaRochesurYon"
+  },
+  {
+    "displayName": "Saint-Gilles",
+    "folderName": "12_St_Gilles"
+  },
+  {
+    "displayName": "Les Sables d'Olonne",
+    "folderName": "13_Les_Sables"
+  },
+  {
+    "displayName": "Quimper",
+    "folderName": "13_Quimper"
+  },
+  {
+    "displayName": "Dinan",
+    "folderName": "14_Dinan"
+  },
+  {
+    "displayName": "Redon",
+    "folderName": "15_Redon"
+  },
+  {
+    "displayName": "Angers",
+    "folderName": "16_Angers"
+  },
+  {
+    "displayName": "Ploermel",
+    "folderName": "17_Ploermel"
+  },
+  {
+    "displayName": "Chateaubriant",
+    "folderName": "18_Chateaubriant"
+  },
+  {
+    "displayName": "Carhaix",
+    "folderName": "19_Carhaix"
+  },
+  {
+    "displayName": "Loudeac",
+    "folderName": "20_Loudeac"
   }
 ]
+
