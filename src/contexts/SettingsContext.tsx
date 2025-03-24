@@ -2,6 +2,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Settings, getSettings, saveSettings, applyTheme } from '@/utils/settingsService';
 import { toast } from 'sonner';
+import citiesConfig from "@/config/cities.json";
+import typesConfig from "@/config/types.json";
 
 interface SettingsContextType {
   settings: Settings | null;
@@ -22,6 +24,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     try {
       setIsLoading(true);
       const fetchedSettings = await getSettings();
+      // Ensure we use the cities from the configuration file if not available in fetched settings
+      if (!fetchedSettings.cities || fetchedSettings.cities.length === 0) {
+        fetchedSettings.cities = citiesConfig;
+      }
       setSettings(fetchedSettings);
       
       // Apply theme immediately and then again after a delay

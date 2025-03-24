@@ -1,0 +1,27 @@
+
+[
+  {
+    "displayName": "Brest",
+    "folderName": "01_Brest"
+  },
+  {
+    "displayName": "Paris",
+    "folderName": "02_Paris"
+  },
+  {
+    "displayName": "Nantes",
+    "folderName": "03_Nantes"
+  },
+  {
+    "displayName": "Lyon",
+    "folderName": "04_Lyon"
+  },
+  {
+    "displayName": "Marseille",
+    "folderName": "05_Marseille"
+  },
+  {
+    "displayName": "Bordeaux",
+    "folderName": "06_Bordeaux"
+  }
+]

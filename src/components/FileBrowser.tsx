@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { AudioFile } from "@/hooks/useAudio";
 import { cn } from "@/lib/utils";
@@ -15,6 +14,9 @@ import {
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select";
+import typesConfig from "@/config/types.json";
+import citiesConfig from "@/config/cities.json";
+import { useSettings } from "@/contexts/SettingsContext";
 
 interface CityFolder {
   displayName: string;
@@ -37,16 +39,13 @@ export const FileBrowser = ({
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedHour, setSelectedHour] = useState<string | null>(null);
   const [audioFolderPath, setAudioFolderPath] = useState("\\\\server\\audioLogs");
-  const [selectedCityFolder, setSelectedCityFolder] = useState<string>("paris");
-  const [selectedType, setSelectedType] = useState<string>("departs");
-  const [cities, setCities] = useState<CityFolder[]>([
-    { displayName: "Paris", folderName: "paris" },
-    { displayName: "Lyon", folderName: "lyon" },
-    { displayName: "Marseille", folderName: "marseille" },
-    { displayName: "Bordeaux", folderName: "bordeaux" }
-  ]);
+  const [selectedCityFolder, setSelectedCityFolder] = useState<string>(citiesConfig[0]?.folderName || "01_Brest");
+  const [selectedType, setSelectedType] = useState<string>(typesConfig[0]?.folderName || "departs");
+  const [cities, setCities] = useState<CityFolder[]>(citiesConfig);
+  const [types, setTypes] = useState(typesConfig);
   const [isLocalPath, setIsLocalPath] = useState(false);
   const [currentHour, setCurrentHour] = useState<number>(new Date().getHours());
+  const { settings } = useSettings();
 
   // Update current hour every minute
   useEffect(() => {
@@ -57,45 +56,21 @@ export const FileBrowser = ({
     return () => clearInterval(interval);
   }, []);
 
-  // Load audio folder path and cities from settings
+  // Load audio folder path from settings
   useEffect(() => {
-    const savedSettings = localStorage.getItem("appSettings");
-    if (savedSettings) {
-      try {
-        const settings = JSON.parse(savedSettings);
-        if (settings.audioFolderPath) {
-          setAudioFolderPath(settings.audioFolderPath);
-          
-          // Check if it's a local path (doesn't start with \\)
-          setIsLocalPath(!settings.audioFolderPath.startsWith('\\\\'));
-        }
-        
-        if (settings.cities && Array.isArray(settings.cities)) {
-          // Handle both old and new format
-          if (settings.cities.length > 0) {
-            if (typeof settings.cities[0] === 'string') {
-              // Old format - convert to new format
-              const convertedCities = settings.cities.map((city: string) => ({
-                displayName: city.charAt(0).toUpperCase() + city.slice(1),
-                folderName: city
-              }));
-              setCities(convertedCities);
-              setSelectedCityFolder(settings.cities[0]);
-            } else {
-              // New format
-              setCities(settings.cities);
-              // Make sure we have a valid default selection
-              if (settings.cities.length > 0) {
-                setSelectedCityFolder(settings.cities[0]?.folderName || "paris");
-              }
-            }
-          }
-        }
-      } catch (error) {
-        console.error("Error parsing settings:", error);
-      }
+    if (settings && settings.audioFolderPath) {
+      setAudioFolderPath(settings.audioFolderPath);
+      
+      // Check if it's a local path (doesn't start with \\)
+      setIsLocalPath(!settings.audioFolderPath.startsWith('\\\\'));
     }
-  }, []);
+    
+    // Use cities from settings if available, otherwise use from config file
+    if (settings && settings.cities && settings.cities.length > 0) {
+      setCities(settings.cities);
+      setSelectedCityFolder(settings.cities[0]?.folderName || citiesConfig[0]?.folderName);
+    }
+  }, [settings]);
 
   const handleSearch = () => {
     if (!selectedDate) return;
@@ -103,7 +78,7 @@ export const FileBrowser = ({
     // Format date as YYYY-MM-DD for folder structure
     const dateFolder = format(selectedDate, "yyyy-MM-dd");
     
-    // Generate path based on the type (departs/retours) and other parameters
+    // Generate path based on the type and other parameters
     let fullPath;
     
     if (isLocalPath) {
@@ -146,8 +121,11 @@ export const FileBrowser = ({
                 <SelectValue placeholder="Sélectionner un type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="departs">Départs</SelectItem>
-                <SelectItem value="retours">Retours</SelectItem>
+                {types.map((type) => (
+                  <SelectItem key={type.folderName} value={type.folderName}>
+                    {type.displayName}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

@@ -1,8 +1,10 @@
+
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { AudioFile } from './useAudioTypes';
 import { useSettings } from '@/contexts/SettingsContext';
+import citiesConfig from "@/config/cities.json";
 
 export const useAudioFiles = (
   setAudioSrc: (src: string | null) => void,
@@ -154,6 +156,7 @@ export const useAudioFiles = (
     
     const today = new Date();
     
+    // Load the previous hour's file by default
     let prevHour = today.getHours() - 1;
     if (prevHour < 0) {
       prevHour = 23;
@@ -162,12 +165,14 @@ export const useAudioFiles = (
     
     const prevHourString = prevHour.toString().padStart(2, '0');
     
+    // Use the first city from settings or config
     const defaultCity = settings.cities && settings.cities.length > 0 
       ? settings.cities[0].folderName 
-      : 'paris';
+      : citiesConfig[0].folderName;
     
     const audioFolderPath = settings.audioFolderPath || '\\\\server\\audioLogs';
     
+    // Default type (departs)
     const defaultType = 'departs';
     
     loadFilesFromUNC(

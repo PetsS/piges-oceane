@@ -1,4 +1,7 @@
 
+import citiesConfig from "@/config/cities.json";
+import typesConfig from "@/config/types.json";
+
 export interface Settings {
   colorScheme: 'light' | 'dark' | 'auto';
   headerTitle: string;
@@ -22,15 +25,10 @@ export interface CityFolder {
 // Default settings
 const defaultSettings: Settings = {
   colorScheme: 'light',
-  headerTitle: 'Piges',
+  headerTitle: 'Audio Marker Interface',
   logoUrl: null,
   enableNotifications: true,
-  cities: [
-    { displayName: 'Paris', folderName: 'paris' },
-    { displayName: 'Lyon', folderName: 'lyon' },
-    { displayName: 'Marseille', folderName: 'marseille' },
-    { displayName: 'Bordeaux', folderName: 'bordeaux' }
-  ],
+  cities: citiesConfig,
   audioFolderPath: '\\\\server\\audioLogs',
   buttonColors: {
     primary: '#1F4A4F',
@@ -57,7 +55,9 @@ export const getSettings = async (): Promise<Settings> => {
             buttonColors: {
               ...defaultSettings.buttonColors,
               ...(parsed.buttonColors || {})
-            }
+            },
+            // Ensure we always have cities data
+            cities: parsed.cities && parsed.cities.length > 0 ? parsed.cities : citiesConfig
           });
           return;
         } catch (e) {

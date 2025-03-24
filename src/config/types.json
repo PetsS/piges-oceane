@@ -1,0 +1,11 @@
+
+[
+  {
+    "displayName": "Départs",
+    "folderName": "departs"
+  },
+  {
+    "displayName": "Retours",
+    "folderName": "retours"
+  }
+]
