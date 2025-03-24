@@ -1,0 +1,11 @@
+
+# Enable rewrite engine
+RewriteEngine On
+
+# Handle requests for files and directories that actually exist
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Redirect all other requests to index.html for client-side routing
+RewriteRule ^ index.html [L]
