@@ -23,7 +23,12 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       setIsLoading(true);
       const fetchedSettings = await getSettings();
       setSettings(fetchedSettings);
-      applyTheme(fetchedSettings);
+      
+      // Apply theme with a slight delay to ensure it takes effect
+      setTimeout(() => {
+        applyTheme(fetchedSettings);
+      }, 100);
+      
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to fetch settings'));
@@ -54,6 +59,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     fetchSettings();
+    
+    // Clear any existing settings in localStorage to force using the new defaults
+    localStorage.removeItem('serverSettings');
   }, []);
 
   return (

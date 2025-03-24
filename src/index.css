@@ -84,6 +84,10 @@
   }
 }
 
+.theme-updated {
+  --force-refresh: true;
+}
+
 @layer base {
   * {
     @apply border-border;

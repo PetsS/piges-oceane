@@ -1,3 +1,4 @@
+
 import { toast } from "sonner";
 
 export interface CityFolder {
@@ -22,7 +23,7 @@ const SETTINGS_API_URL = "http://your-api-server.com/api/settings";
 
 // Default settings to use if fetching fails
 const DEFAULT_SETTINGS: Settings = {
-  headerTitle: "Lecteur Audio",
+  headerTitle: "Piges",
   buttonColors: {
     primary: "#1F4A4F",
     secondary: "#8F8F8F",
@@ -147,4 +148,8 @@ export const applyTheme = (settings: Settings) => {
   document.documentElement.style.setProperty('--secondary', colorToHsl(settings.buttonColors.secondary));
   document.documentElement.style.setProperty('--accent', colorToHsl(settings.buttonColors.accent));
   document.documentElement.style.setProperty('--sidebar-background', colorToHsl(settings.buttonColors.secondary));
+  
+  // Force a refresh of the theme
+  document.documentElement.classList.remove('theme-updated');
+  setTimeout(() => document.documentElement.classList.add('theme-updated'), 0);
 };

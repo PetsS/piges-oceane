@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { FileBrowser } from "@/components/FileBrowser";
@@ -79,7 +78,7 @@ const Index = () => {
       <header className="bg-background border-b py-4 px-6">
         <div>
           <h1 className="text-2xl font-bold">
-            {settings.headerTitle || "Lecteur Audio"}
+            {settings.headerTitle}
           </h1>
         </div>
       </header>
