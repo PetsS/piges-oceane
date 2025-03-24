@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { FileBrowser } from "@/components/FileBrowser";
@@ -78,7 +79,12 @@ const Index = () => {
       <header className="bg-background border-b py-4 px-6">
         <div>
           <h1 className="text-2xl font-bold">
-            Audio Marker Interface
+            <span 
+              className="text-primary" 
+              style={{ color: settings.buttonColors.primary }}
+            >
+              A
+            </span>udio Marker Interface
           </h1>
         </div>
       </header>
@@ -154,3 +160,4 @@ const Index = () => {
 };
 
 export default Index;
+
