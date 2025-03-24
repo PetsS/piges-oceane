@@ -1,6 +1,3 @@
-
-import { Color } from '@/components/ColorPicker';
-
 export interface Settings {
   colorScheme: 'light' | 'dark' | 'auto';
   headerTitle: string;

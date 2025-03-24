@@ -66,8 +66,8 @@ const Index = () => {
     return (
       <div className="h-screen flex items-center justify-center bg-background">
         <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4">Chargement des paramètres...</h2>
-          <p>Récupération des paramètres depuis le serveur...</p>
+          <h2 className="text-2xl font-bold mb-4">Loading settings...</h2>
+          <p>Retrieving settings from the server...</p>
         </div>
       </div>
     );
@@ -78,7 +78,7 @@ const Index = () => {
       <header className="bg-background border-b py-4 px-6">
         <div>
           <h1 className="text-2xl font-bold">
-            Interface Marqueurs Audio
+            Audio Marker Interface
           </h1>
         </div>
       </header>
@@ -87,8 +87,8 @@ const Index = () => {
         <div className="md:col-span-1 h-full overflow-hidden">
           <Tabs defaultValue="browser" className="h-full flex flex-col">
             <TabsList className="grid grid-cols-2 w-full mb-4">
-              <TabsTrigger value="browser">Serveur</TabsTrigger>
-              <TabsTrigger value="local">Fichiers locaux</TabsTrigger>
+              <TabsTrigger value="browser">Server</TabsTrigger>
+              <TabsTrigger value="local">Local files</TabsTrigger>
             </TabsList>
             
             <TabsContent value="browser" className="flex-1 overflow-hidden">
@@ -117,7 +117,7 @@ const Index = () => {
               onVolumeChange={changeVolume}
               onSeek={seek}
               formatTime={formatTime}
-              audioTitle={currentAudioFile ? currentAudioFile.name : "Aucun audio chargé"}
+              audioTitle={currentAudioFile ? currentAudioFile.name : "No audio loaded"}
               isLoading={isLoading}
               isBuffering={isBuffering}
             />
@@ -131,7 +131,7 @@ const Index = () => {
                   className="animate-fade-in"
                 >
                   <Headphones className="h-4 w-4 mr-2" />
-                  Éditer l'audio
+                  Edit audio
                 </Button>
               </div>
             )}
