@@ -5,7 +5,7 @@ import { MarkerControls } from "@/components/MarkerControls";
 import { LocalAudioLoader } from "@/components/LocalAudioLoader";
 import { useAudio } from "@/hooks/useAudio";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Scissors } from "lucide-react";
+import { Headphones } from "lucide-react";
 import { useSettings } from "@/contexts/SettingsContext";
 import { Button } from "@/components/ui/button";
 
@@ -78,7 +78,7 @@ const Index = () => {
       <header className="bg-background border-b py-4 px-6">
         <div>
           <h1 className="text-2xl font-bold">
-            {settings.headerTitle}
+            Interface Marqueurs Audio
           </h1>
         </div>
       </header>
@@ -130,7 +130,7 @@ const Index = () => {
                   onClick={() => setShowMarkerControls(true)}
                   className="animate-fade-in"
                 >
-                  <Scissors className="h-4 w-4 mr-2" />
+                  <Headphones className="h-4 w-4 mr-2" />
                   Éditer l'audio
                 </Button>
               </div>
