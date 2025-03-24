@@ -78,11 +78,9 @@ const Index = () => {
       <header className="bg-background border-b py-4 px-6">
         <div>
           <h1 className="text-2xl font-bold">
-            <span 
-              style={{ color: settings.buttonColors.primary }}
-            >
-              A
-            </span>udio Marker Interface
+            <span style={{ color: settings.buttonColors.primary }}>A</span>udio 
+            <span style={{ color: settings.buttonColors.primary }}> M</span>arker 
+            <span style={{ color: settings.buttonColors.primary }}> I</span>nterface
           </h1>
         </div>
       </header>
