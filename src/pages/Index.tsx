@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { FileBrowser } from "@/components/FileBrowser";
@@ -80,7 +79,6 @@ const Index = () => {
         <div>
           <h1 className="text-2xl font-bold">
             <span 
-              className="text-primary" 
               style={{ color: settings.buttonColors.primary }}
             >
               A
@@ -160,4 +158,3 @@ const Index = () => {
 };
 
 export default Index;
-
