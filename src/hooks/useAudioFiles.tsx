@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -20,15 +19,12 @@ export const useAudioFiles = (
   const [currentAudioFile, setCurrentAudioFile] = useState<AudioFile | null>(null);
   const { settings } = useSettings();
   
-  // Use ref to break circular dependency
   const loadAudioFileRef = useRef<(file: AudioFile) => void>();
 
-  // Define loadAudioFile function
   const loadAudioFile = useCallback((file: AudioFile) => {
     setIsLoading(true);
     setCurrentAudioFile(file);
     
-    // Clean up previous audio source if it exists
     if (audioRef.current) {
       audioRef.current.pause();
       if (audioSrc && audioSrc.startsWith('blob:')) {
@@ -38,16 +34,13 @@ export const useAudioFiles = (
     
     setAudioBuffer(null);
     
-    // For local files or real URL paths (blob: or http)
     if (file.path.startsWith('blob:') || file.path.startsWith('http')) {
       console.log("Loading large local file:", file.name, file.path);
       
-      // Create a new audio element and set its source
       const audio = new Audio();
-      audio.preload = "metadata"; // Only load metadata initially to reduce memory usage
+      audio.preload = "metadata";
       audio.src = file.path;
       
-      // Check if the audio can be played
       audio.addEventListener('loadedmetadata', () => {
         console.log("Audio metadata loaded:", file.name, "Duration:", audio.duration);
         setAudioSrc(file.path);
@@ -55,7 +48,6 @@ export const useAudioFiles = (
         setCurrentTime(0);
         setIsLoading(false);
         
-        // Set the duration for the markers
         if (audio.duration) {
           initializeMarkers(audio.duration);
         }
@@ -63,14 +55,12 @@ export const useAudioFiles = (
         toast.success(`Audio file loaded: ${file.name}`);
       }, { once: true });
       
-      // Handle loading errors
       audio.addEventListener('error', (e) => {
         console.error("Error loading audio file:", e);
         toast.error(`Couldn't load audio file: ${file.name}`);
         setIsLoading(false);
       }, { once: true });
       
-      // Force load the audio metadata
       audio.load();
     } else {
       console.log("Loading mock network file:", file.name);
@@ -84,16 +74,12 @@ export const useAudioFiles = (
             setCurrentTime(0);
             setIsLoading(false);
             
-            // Use 3600 seconds (1 hour) for duration to match file size
             const duration = 3600;
             
             initializeMarkers(duration);
             
-            // Create a minimal buffer for visualization only, not loading the full hour
-            // of audio data into memory which would be inefficient
             const buffer = ctx.createBuffer(2, Math.min(duration * ctx.sampleRate, 10 * ctx.sampleRate), ctx.sampleRate);
             
-            // Only fill a small portion of the buffer with data for efficiency
             for (let channel = 0; channel < 2; channel++) {
               const data = buffer.getChannelData(channel);
               const sampleLength = Math.min(data.length, 10 * ctx.sampleRate);
@@ -116,7 +102,6 @@ export const useAudioFiles = (
     }
   }, [audioSrc, getAudioContext, setAudioSrc, setAudioBuffer, setIsPlaying, setCurrentTime, initializeMarkers, audioRef]);
 
-  // Update ref with the current loadAudioFile function
   useEffect(() => {
     loadAudioFileRef.current = loadAudioFile;
   }, [loadAudioFile]);
@@ -131,21 +116,19 @@ export const useAudioFiles = (
         const mockFile: AudioFile = {
           name: `${hour}.mp3`,
           path: path,
-          size: '140 MB', // Updated to reflect 1-hour audio file size
+          size: '140 MB',
           type: 'audio/mpeg',
           lastModified: format(date, 'yyyy-MM-dd')
         };
         
         setAudioFiles([mockFile]);
         
-        // Use the ref to call loadAudioFile to break circular dependency
         if (loadAudioFileRef.current) {
           loadAudioFileRef.current(mockFile);
         }
       } else {
         const mockFiles: AudioFile[] = Array.from({ length: 24 }, (_, i) => {
           const hourStr = i.toString().padStart(2, '0');
-          // Extract the base path (excluding the hour.mp3 part)
           const basePath = path.includes('\\\\') 
             ? path.substring(0, path.lastIndexOf('\\')) 
             : path.substring(0, path.lastIndexOf('/'));
@@ -153,7 +136,7 @@ export const useAudioFiles = (
           return {
             name: `${hourStr}.mp3`,
             path: `${basePath}\\${hourStr}.mp3`,
-            size: `140 MB`, // Updated to consistently show 140MB for all files
+            size: '140 MB',
             type: 'audio/mpeg',
             lastModified: format(date, 'yyyy-MM-dd')
           };
@@ -164,30 +147,34 @@ export const useAudioFiles = (
       
       setIsLoading(false);
     }, 1500);
-  }, []); // Remove loadAudioFile from dependencies to break circular reference
+  }, []);
 
-  // Initialize with default files on component mount
   useEffect(() => {
     if (!settings) return;
     
     const today = new Date();
-    const currentHour = today.getHours().toString().padStart(2, '0');
     
-    // Get the first city from settings or default to 'paris'
+    let prevHour = today.getHours() - 1;
+    if (prevHour < 0) {
+      prevHour = 23;
+      today.setDate(today.getDate() - 1);
+    }
+    
+    const prevHourString = prevHour.toString().padStart(2, '0');
+    
     const defaultCity = settings.cities && settings.cities.length > 0 
       ? settings.cities[0].folderName 
       : 'paris';
     
     const audioFolderPath = settings.audioFolderPath || '\\\\server\\audioLogs';
     
-    // Default type is 'departs'
     const defaultType = 'departs';
     
     loadFilesFromUNC(
-      `${audioFolderPath}\\${defaultType}\\${defaultCity}\\${format(today, 'yyyy-MM-dd')}\\${currentHour}.mp3`, 
+      `${audioFolderPath}\\${defaultType}\\${defaultCity}\\${format(today, 'yyyy-MM-dd')}\\${prevHourString}.mp3`, 
       defaultCity, 
       today, 
-      currentHour
+      prevHourString
     );
   }, [settings, loadFilesFromUNC]);
 
