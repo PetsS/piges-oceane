@@ -144,12 +144,24 @@ export const colorToHsl = (color: string) => {
 
 // Apply theme based on settings
 export const applyTheme = (settings: Settings) => {
+  // Set CSS variables for both light and dark mode
   document.documentElement.style.setProperty('--primary', colorToHsl(settings.buttonColors.primary));
+  document.documentElement.style.setProperty('--primary-foreground', '210 40% 98%');
+  
   document.documentElement.style.setProperty('--secondary', colorToHsl(settings.buttonColors.secondary));
   document.documentElement.style.setProperty('--accent', colorToHsl(settings.buttonColors.accent));
+  
+  // Also update sidebar colors
   document.documentElement.style.setProperty('--sidebar-background', colorToHsl(settings.buttonColors.secondary));
+  document.documentElement.style.setProperty('--sidebar-primary', colorToHsl(settings.buttonColors.primary));
   
   // Force a refresh of the theme
   document.documentElement.classList.remove('theme-updated');
-  setTimeout(() => document.documentElement.classList.add('theme-updated'), 0);
+  setTimeout(() => document.documentElement.classList.add('theme-updated'), 10);
+  
+  console.log('Theme applied:', {
+    primary: settings.buttonColors.primary,
+    secondary: settings.buttonColors.secondary,
+    accent: settings.buttonColors.accent
+  });
 };

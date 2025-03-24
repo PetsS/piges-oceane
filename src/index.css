@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -86,6 +87,7 @@
 
 .theme-updated {
   --force-refresh: true;
+  transition: all 0.1s ease-in-out;
 }
 
 @layer base {
