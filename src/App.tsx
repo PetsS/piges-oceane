@@ -6,7 +6,6 @@ import { SettingsProvider } from "@/contexts/SettingsContext";
 
 const Login = lazy(() => import("@/pages/Login"));
 const Index = lazy(() => import("@/pages/Index"));
-const Admin = lazy(() => import("@/pages/Admin"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
 function App() {
@@ -19,11 +18,6 @@ function App() {
             <Route path="/" element={
               <PrivateRoute>
                 <Index />
-              </PrivateRoute>
-            } />
-            <Route path="/admin" element={
-              <PrivateRoute>
-                <Admin />
               </PrivateRoute>
             } />
             <Route path="*" element={<NotFound />} />
