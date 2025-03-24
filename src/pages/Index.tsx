@@ -1,20 +1,17 @@
 
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState } from "react";
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { FileBrowser } from "@/components/FileBrowser";
 import { MarkerControls } from "@/components/MarkerControls";
 import { LocalAudioLoader } from "@/components/LocalAudioLoader";
 import { useAudio } from "@/hooks/useAudio";
-import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Cog, LogOut, Scissors } from "lucide-react";
+import { Scissors } from "lucide-react";
 import { useSettings } from "@/contexts/SettingsContext";
+import { Button } from "@/components/ui/button";
 
 const Index = () => {
-  const [showAdmin, setShowAdmin] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
-  const navigate = useNavigate();
   const { settings } = useSettings();
   
   const {
@@ -40,18 +37,6 @@ const Index = () => {
     showMarkerControls,
     setShowMarkerControls
   } = useAudio();
-
-  useEffect(() => {
-    const isAdmin = localStorage.getItem("isAdmin") === "true";
-    setShowAdmin(isAdmin);
-  }, []);
-
-  const handleLogout = () => {
-    localStorage.removeItem("isAuthenticated");
-    localStorage.removeItem("currentUser");
-    localStorage.removeItem("isAdmin");
-    navigate("/login");
-  };
 
   const handleFileSelect = (file) => {
     setShowMarkerControls(false);
@@ -91,23 +76,11 @@ const Index = () => {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-background">
-      <header className="bg-background border-b py-4 px-6 flex justify-between items-center">
+      <header className="bg-background border-b py-4 px-6">
         <div>
           <h1 className="text-2xl font-bold">
             {settings.headerTitle || "Lecteur Audio"}
           </h1>
-        </div>
-        <div className="flex items-center gap-2">
-          {showAdmin && (
-            <Button variant="outline" size="sm" onClick={() => navigate("/admin")}>
-              <Cog className="mr-2 h-4 w-4" />
-              Administration
-            </Button>
-          )}
-          <Button variant="ghost" size="sm" onClick={handleLogout}>
-            <LogOut className="mr-2 h-4 w-4" />
-            Déconnexion
-          </Button>
         </div>
       </header>
 
