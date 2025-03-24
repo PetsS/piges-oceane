@@ -130,7 +130,7 @@ export const useAudioFiles = (
       if (hour) {
         const mockFile: AudioFile = {
           name: `${hour}.mp3`,
-          path: `${path}\\${hour}.mp3`,
+          path: path,
           size: '140 MB', // Updated to reflect 1-hour audio file size
           type: 'audio/mpeg',
           lastModified: format(date, 'yyyy-MM-dd')
@@ -145,9 +145,14 @@ export const useAudioFiles = (
       } else {
         const mockFiles: AudioFile[] = Array.from({ length: 24 }, (_, i) => {
           const hourStr = i.toString().padStart(2, '0');
+          // Extract the base path (excluding the hour.mp3 part)
+          const basePath = path.includes('\\\\') 
+            ? path.substring(0, path.lastIndexOf('\\')) 
+            : path.substring(0, path.lastIndexOf('/'));
+          
           return {
             name: `${hourStr}.mp3`,
-            path: `${path}\\${hourStr}.mp3`,
+            path: `${basePath}\\${hourStr}.mp3`,
             size: `140 MB`, // Updated to consistently show 140MB for all files
             type: 'audio/mpeg',
             lastModified: format(date, 'yyyy-MM-dd')
@@ -175,8 +180,11 @@ export const useAudioFiles = (
     
     const audioFolderPath = settings.audioFolderPath || '\\\\server\\audioLogs';
     
+    // Default type is 'departs'
+    const defaultType = 'departs';
+    
     loadFilesFromUNC(
-      `${audioFolderPath}\\${defaultCity}\\${format(today, 'yyyy-MM-dd')}`, 
+      `${audioFolderPath}\\${defaultType}\\${defaultCity}\\${format(today, 'yyyy-MM-dd')}\\${currentHour}.mp3`, 
       defaultCity, 
       today, 
       currentHour

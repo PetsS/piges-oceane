@@ -1,143 +1,129 @@
 
-import { toast } from "sonner";
-
-export interface CityFolder {
-  displayName: string;
-  folderName: string;
-}
+import { Color } from '@/components/ColorPicker';
 
 export interface Settings {
+  colorScheme: 'light' | 'dark' | 'auto';
   headerTitle: string;
+  logoUrl: string | null;
+  enableNotifications: boolean;
+  cities: { displayName: string; folderName: string; }[];
+  audioFolderPath: string;
   buttonColors: {
     primary: string;
     secondary: string;
     accent: string;
   };
-  audioFolderPath: string;
-  cities: CityFolder[];
 }
 
-// Server endpoint where settings are stored - in a real implementation,
-// this would be your backend API endpoint
-const SETTINGS_API_URL = "http://your-api-server.com/api/settings";
-
-// Default settings to use if fetching fails
-const DEFAULT_SETTINGS: Settings = {
-  headerTitle: "Piges",
-  buttonColors: {
-    primary: "#1F4A4F",
-    secondary: "#8F8F8F",
-    accent: "#8F8F8F",
-  },
-  audioFolderPath: "\\\\server\\audioLogs",
+// Default settings
+const defaultSettings: Settings = {
+  colorScheme: 'light',
+  headerTitle: 'Piges',
+  logoUrl: null,
+  enableNotifications: true,
   cities: [
-    { displayName: "Paris", folderName: "paris" },
-    { displayName: "Lyon", folderName: "lyon" },
-    { displayName: "Marseille", folderName: "marseille" },
-    { displayName: "Bordeaux", folderName: "bordeaux" }
-  ]
+    { displayName: 'Paris', folderName: 'paris' },
+    { displayName: 'Lyon', folderName: 'lyon' },
+    { displayName: 'Marseille', folderName: 'marseille' },
+    { displayName: 'Bordeaux', folderName: 'bordeaux' }
+  ],
+  audioFolderPath: '\\\\server\\audioLogs',
+  buttonColors: {
+    primary: '#1F4A4F',
+    secondary: '#8F8F8F',
+    accent: '#8F8F8F'
+  }
 };
 
-// For demonstration purposes, we're using localStorage as a mock server
-// In a real implementation, remove this and use actual API calls
-const MOCK_SERVER_STORAGE_KEY = "serverSettings";
-
-// Initialize mock server storage if it doesn't exist
-if (!localStorage.getItem(MOCK_SERVER_STORAGE_KEY)) {
-  localStorage.setItem(MOCK_SERVER_STORAGE_KEY, JSON.stringify(DEFAULT_SETTINGS));
-}
-
+// Function to get settings from server or localStorage
 export const getSettings = async (): Promise<Settings> => {
-  try {
-    // In a real implementation, replace this with fetch to your API
-    // const response = await fetch(SETTINGS_API_URL);
-    // const data = await response.json();
-    // return data;
-    
-    // Mock implementation using localStorage
-    const storedSettings = localStorage.getItem(MOCK_SERVER_STORAGE_KEY);
-    if (storedSettings) {
-      return JSON.parse(storedSettings) as Settings;
-    }
-    return DEFAULT_SETTINGS;
-  } catch (error) {
-    console.error("Failed to fetch settings:", error);
-    toast.error("Impossible de récupérer les paramètres du serveur. Utilisation des paramètres par défaut.");
-    return DEFAULT_SETTINGS;
-  }
+  return new Promise((resolve) => {
+    // Simulate API call with a timeout
+    setTimeout(() => {
+      // Try to get settings from localStorage first
+      const savedSettings = localStorage.getItem('serverSettings');
+      if (savedSettings) {
+        try {
+          const parsed = JSON.parse(savedSettings);
+          // Merge with default settings to ensure all fields are present
+          resolve({
+            ...defaultSettings,
+            ...parsed,
+            // Ensure buttonColors is properly structured
+            buttonColors: {
+              ...defaultSettings.buttonColors,
+              ...(parsed.buttonColors || {})
+            }
+          });
+          return;
+        } catch (e) {
+          console.error('Failed to parse saved settings:', e);
+        }
+      }
+      
+      // If no saved settings or parsing failed, use defaults
+      resolve(defaultSettings);
+    }, 800);
+  });
 };
 
+// Function to save settings
 export const saveSettings = async (settings: Settings): Promise<boolean> => {
-  try {
-    // In a real implementation, replace this with fetch to your API
-    // const response = await fetch(SETTINGS_API_URL, {
-    //   method: 'POST',
-    //   headers: {
-    //     'Content-Type': 'application/json',
-    //   },
-    //   body: JSON.stringify(settings),
-    // });
-    // return response.ok;
-    
-    // Mock implementation using localStorage
-    localStorage.setItem(MOCK_SERVER_STORAGE_KEY, JSON.stringify(settings));
-    return true;
-  } catch (error) {
-    console.error("Failed to save settings:", error);
-    toast.error("Impossible d'enregistrer les paramètres sur le serveur.");
-    return false;
-  }
+  return new Promise((resolve) => {
+    // Simulate API call with a timeout
+    setTimeout(() => {
+      try {
+        localStorage.setItem('serverSettings', JSON.stringify(settings));
+        resolve(true);
+      } catch (e) {
+        console.error('Failed to save settings:', e);
+        resolve(false);
+      }
+    }, 800);
+  });
 };
 
-export const colorToHsl = (color: string) => {
-  if (color.startsWith('hsl')) {
-    const match = color.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
-    if (match) {
-      return `${match[1]} ${match[2]}% ${match[3]}%`;
-    }
-  }
+// Helper function to convert hex color to HSL format for CSS variables
+export const colorToHsl = (hexColor: string): string => {
+  // Default color if conversion fails
+  let h = 210, s = 40, l = 96;
   
-  let r = 0, g = 0, b = 0;
-  
-  if (color.startsWith('#')) {
-    const hex = color.slice(1);
-    r = parseInt(hex.length === 3 ? hex[0] + hex[0] : hex.substring(0, 2), 16);
-    g = parseInt(hex.length === 3 ? hex[1] + hex[1] : hex.substring(2, 4), 16);
-    b = parseInt(hex.length === 3 ? hex[2] + hex[2] : hex.substring(4, 6), 16);
-  } 
-  else if (color.startsWith('rgb')) {
-    const match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*\d+(?:\.\d+)?)?\)/);
-    if (match) {
-      r = parseInt(match[1], 10);
-      g = parseInt(match[2], 10);
-      b = parseInt(match[3], 10);
-    }
-  }
-  
-  r /= 255;
-  g /= 255;
-  b /= 255;
-  
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  let h = 0, s = 0, l = (max + min) / 2;
-  
-  if (max !== min) {
-    const d = max - min;
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  try {
+    // Remove hash if present
+    hexColor = hexColor.replace('#', '');
     
-    switch (max) {
-      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-      case g: h = (b - r) / d + 2; break;
-      case b: h = (r - g) / d + 4; break;
+    // Parse hex values
+    const r = parseInt(hexColor.slice(0, 2), 16) / 255;
+    const g = parseInt(hexColor.slice(2, 4), 16) / 255;
+    const b = parseInt(hexColor.slice(4, 6), 16) / 255;
+    
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    let hue = 0, sat = 0;
+    const light = (max + min) / 2;
+    
+    if (max !== min) {
+      const d = max - min;
+      sat = light > 0.5 ? d / (2 - max - min) : d / (max + min);
+      
+      switch (max) {
+        case r: hue = (g - b) / d + (g < b ? 6 : 0); break;
+        case g: hue = (b - r) / d + 2; break;
+        case b: hue = (r - g) / d + 4; break;
+      }
+      
+      hue /= 6;
     }
     
-    h /= 6;
+    // Convert to degrees, percentages
+    h = Math.round(hue * 360);
+    s = Math.round(sat * 100);
+    l = Math.round(light * 100);
+    
+    console.log(`Converted ${hexColor} to HSL: ${h} ${s}% ${l}%`);
+  } catch (error) {
+    console.error('Error converting color to HSL:', error);
   }
-  
-  h = Math.round(h * 360);
-  s = Math.round(s * 100);
-  l = Math.round(l * 100);
   
   return `${h} ${s}% ${l}%`;
 };

@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { AudioFile } from "@/hooks/useAudio";
 import { cn } from "@/lib/utils";
-import { Calendar, Search, Clock, FileAudio, MapPin } from "lucide-react";
+import { Calendar, Search, Clock, FileAudio, MapPin, GitFork } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -38,6 +38,7 @@ export const FileBrowser = ({
   const [selectedHour, setSelectedHour] = useState<string | null>(null);
   const [audioFolderPath, setAudioFolderPath] = useState("\\\\server\\audioLogs");
   const [selectedCityFolder, setSelectedCityFolder] = useState<string>("paris");
+  const [selectedType, setSelectedType] = useState<string>("departs");
   const [cities, setCities] = useState<CityFolder[]>([
     { displayName: "Paris", folderName: "paris" },
     { displayName: "Lyon", folderName: "lyon" },
@@ -102,15 +103,15 @@ export const FileBrowser = ({
     // Format date as YYYY-MM-DD for folder structure
     const dateFolder = format(selectedDate, "yyyy-MM-dd");
     
-    // Generate path based on whether it's a local path or a network path
+    // Generate path based on the type (departs/retours) and other parameters
     let fullPath;
     
     if (isLocalPath) {
       // For local paths, construct the path without doubling the backslashes
-      fullPath = `${audioFolderPath}\\${selectedCityFolder}\\${dateFolder}${selectedHour ? `\\${selectedHour}.mp3` : ''}`;
+      fullPath = `${audioFolderPath}\\${selectedType}\\${selectedCityFolder}\\${dateFolder}${selectedHour ? `\\${selectedHour}.mp3` : ''}`;
     } else {
       // For network paths (UNC), ensure the format starts with double backslashes
-      fullPath = `${audioFolderPath}\\${selectedCityFolder}\\${dateFolder}${selectedHour ? `\\${selectedHour}.mp3` : ''}`;
+      fullPath = `${audioFolderPath}\\${selectedType}\\${selectedCityFolder}\\${dateFolder}${selectedHour ? `\\${selectedHour}.mp3` : ''}`;
     }
     
     onPathChange(fullPath, selectedCityFolder, selectedDate, selectedHour);
@@ -132,6 +133,25 @@ export const FileBrowser = ({
     <div className="w-full flex flex-col h-full glass-panel rounded-lg overflow-hidden animate-fade-in">
       <div className="p-4 bg-secondary/50 backdrop-blur-md border-b">
         <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium flex items-center gap-2">
+              <GitFork className="h-4 w-4" />
+              <span>Type</span>
+            </label>
+            <Select 
+              value={selectedType} 
+              onValueChange={setSelectedType}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Sélectionner un type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="departs">Départs</SelectItem>
+                <SelectItem value="retours">Retours</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="space-y-2">
             <label className="text-sm font-medium flex items-center gap-2">
               <MapPin className="h-4 w-4" />
