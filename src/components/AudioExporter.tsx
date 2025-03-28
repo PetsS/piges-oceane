@@ -1,6 +1,6 @@
 
 import { Button } from "@/components/ui/button";
-import { Scissors, FileDown } from "lucide-react";
+import { Scissors, FileDown, Download } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { AudioMarker } from "@/hooks/useAudio";
 import {
@@ -66,7 +66,7 @@ export const AudioExporter = ({
           </div>
           <div>
             <Badge variant="outline" className="text-xs">
-              WAV + MP3
+              WAV
             </Badge>
           </div>
         </div>
@@ -84,7 +84,7 @@ export const AudioExporter = ({
                 {isExporting ? (
                   <Scissors className="h-4 w-4 mr-2 animate-pulse" />
                 ) : (
-                  <FileDown className="h-4 w-4 mr-2" />
+                  <Download className="h-4 w-4 mr-2" />
                 )}
                 {isExporting ? "Traitement en cours..." : "Exporter l'audio"}
                 {isExporting && (
@@ -103,7 +103,7 @@ export const AudioExporter = ({
             <p>
               {!canExport
                 ? "Définissez les marqueurs de début et de fin"
-                : "Découper et exporter la section audio sélectionnée (WAV + MP3)"}
+                : "Découper et exporter la section audio sélectionnée (WAV)"}
             </p>
           </TooltipContent>
         </Tooltip>
