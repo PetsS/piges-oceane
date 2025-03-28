@@ -45,9 +45,11 @@ export class FFmpegExporter {
       // Prepare the data for MP3 encoding
       const channels = audioData.numberOfChannels;
       const sampleRate = audioData.sampleRate;
-      const bitRate = 192; // 192kbps, good quality
+      const bitRate = 128; // 128kbps is generally good quality
       
-      // Create MP3 encoder - corrected implementation
+      console.log(`Encoding with parameters: channels=${channels}, sampleRate=${sampleRate}, bitRate=${bitRate}`);
+      
+      // Create MP3 encoder
       const encoder = new Mp3Encoder(
         Math.min(2, channels), // lamejs supports max 2 channels
         sampleRate,
@@ -72,6 +74,8 @@ export class FFmpegExporter {
       const totalChunks = Math.ceil(sampleCount / blockSize);
       let currentChunk = 0;
       
+      console.log(`Processing ${totalChunks} chunks of audio data`);
+      
       for (let i = 0; i < sampleCount; i += blockSize) {
         const blockLength = Math.min(blockSize, sampleCount - i);
         
@@ -89,7 +93,7 @@ export class FFmpegExporter {
         }
         
         // Encode this block
-        const mp3Block = encoder.encodeBuffer(leftBlock, rightBlock);
+        const mp3Block = encoder.encodeBuffer(leftBlock, channels > 1 ? rightBlock : leftBlock);
         if (mp3Block.length > 0) {
           mp3Data.push(mp3Block);
         }
@@ -106,6 +110,7 @@ export class FFmpegExporter {
       }
       
       listener.onProgress(95);
+      console.log('MP3 encoding completed successfully');
       
       // Concatenate the MP3 chunks
       let totalLength = 0;
@@ -117,6 +122,8 @@ export class FFmpegExporter {
         mp3Buffer.set(chunk, offset);
         offset += chunk.length;
       });
+      
+      console.log(`Created MP3 buffer of size: ${mp3Buffer.length} bytes`);
       
       // Create a blob and URL
       const blob = new Blob([mp3Buffer], { type: 'audio/mp3' });
