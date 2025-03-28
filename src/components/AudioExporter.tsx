@@ -98,7 +98,6 @@ export const AudioExporter = ({
                 <Progress 
                   value={exportProgress} 
                   className="h-2 mt-2" 
-                  indicatorClassName="bg-primary"
                 />
               )}
               
