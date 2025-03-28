@@ -10,7 +10,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Progress } from "@/components/ui/progress";
-import { useState, useEffect } from "react";
 
 interface AudioExporterProps {
   markers: AudioMarker[];
@@ -18,6 +17,7 @@ interface AudioExporterProps {
   isExporting: boolean;
   formatTimeDetailed: (time: number) => string;
   canExport: boolean;
+  exportProgress?: number;
 }
 
 export const AudioExporter = ({
@@ -26,31 +26,10 @@ export const AudioExporter = ({
   isExporting,
   formatTimeDetailed,
   canExport,
+  exportProgress = 0,
 }: AudioExporterProps) => {
   const startMarker = markers.find((marker) => marker.type === "start");
   const endMarker = markers.find((marker) => marker.type === "end");
-  const [progress, setProgress] = useState(0);
-
-  // Simulate progress when exporting
-  useEffect(() => {
-    if (isExporting) {
-      setProgress(0);
-      const interval = setInterval(() => {
-        setProgress((prev) => {
-          const newValue = prev + (2 + Math.random() * 3);
-          return newValue < 95 ? newValue : 95;
-        });
-      }, 200);
-      
-      return () => {
-        clearInterval(interval);
-        // When finished, set to 100%
-        setTimeout(() => setProgress(100), 300);
-        // Then reset after a delay
-        setTimeout(() => setProgress(0), 1000);
-      };
-    }
-  }, [isExporting]);
 
   return (
     <div className="space-y-3">
@@ -86,7 +65,7 @@ export const AudioExporter = ({
                 ) : (
                   <FileDown className="h-4 w-4 mr-2" />
                 )}
-                {isExporting ? "Traitement en cours..." : "Exporter l'audio"}
+                {isExporting ? `Traitement en cours... ${exportProgress}%` : "Exporter l'audio"}
                 {isExporting && (
                   <Badge variant="outline" className="ml-2 animate-pulse">
                     Patientez...
@@ -95,7 +74,7 @@ export const AudioExporter = ({
               </Button>
               
               {isExporting && (
-                <Progress value={progress} className="h-2 w-full" />
+                <Progress value={exportProgress} className="h-2 w-full" />
               )}
             </div>
           </TooltipTrigger>

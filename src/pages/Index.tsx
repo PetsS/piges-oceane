@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { FileBrowser } from "@/components/FileBrowser";
@@ -10,7 +11,6 @@ import { useSettings } from "@/contexts/SettingsContext";
 import { Button } from "@/components/ui/button";
 
 const Index = () => {
-  const [isExporting, setIsExporting] = useState(false);
   const { settings } = useSettings();
   
   const {
@@ -34,7 +34,9 @@ const Index = () => {
     currentAudioFile,
     isBuffering,
     showMarkerControls,
-    setShowMarkerControls
+    setShowMarkerControls,
+    isExporting,
+    exportProgress
   } = useAudio();
 
   const handleFileSelect = (file) => {
@@ -45,21 +47,6 @@ const Index = () => {
   const handleSearch = (path, city, date, hour) => {
     setShowMarkerControls(false);
     loadFilesFromUNC(path, city, date, hour);
-  };
-
-  const handleExport = async () => {
-    try {
-      setIsExporting(true);
-      console.log("Starting export process");
-      await exportTrimmedAudio();
-    } catch (error) {
-      console.error("Export error:", error);
-    } finally {
-      setTimeout(() => {
-        setIsExporting(false);
-        console.log("Export process completed");
-      }, 500);
-    }
   };
 
   if (!settings) {
@@ -142,10 +129,11 @@ const Index = () => {
               <MarkerControls
                 markers={markers}
                 onAddMarker={addMarker}
-                onExport={handleExport}
+                onExport={exportTrimmedAudio}
                 currentTime={currentTime}
                 formatTimeDetailed={formatTimeDetailed}
                 isExporting={isExporting}
+                exportProgress={exportProgress}
               />
             )}
           </div>
