@@ -3,7 +3,6 @@ import { useRef, useCallback } from 'react';
 import { toast } from 'sonner';
 import { AudioMarker } from './useAudioTypes';
 import { useAudioContext } from './useAudioContext';
-import * as lamejs from 'lamejs';
 
 export const useAudioExport = (
   audioBuffer: AudioBuffer | null,
@@ -170,18 +169,15 @@ export const useAudioExport = (
       
       console.log("Trimmed buffer created successfully, proceeding to MP3 export");
       
-      // Use lamejs to convert to MP3
-      const mp3Data = audioBufferToMp3(trimmedBuffer);
-      const trimmedAudioBlob = new Blob(mp3Data, { type: 'audio/mp3' });
-      
-      console.log(`Successfully encoded to MP3, blob size: ${trimmedAudioBlob.size} bytes`);
+      // Convert to WAV first (more reliable than direct MP3 conversion)
+      const wavBlob = await audioBufferToWav(trimmedBuffer);
       
       const fileName = currentAudioFile ? 
                       currentAudioFile.name.replace(/\.[^/.]+$/, "") : 
                       "audio";
       const exportFileName = `${fileName}_${formatTime(startTime).replace(':', '')}-${formatTime(endTime).replace(':', '')}.mp3`;
       
-      const downloadUrl = URL.createObjectURL(trimmedAudioBlob);
+      const downloadUrl = URL.createObjectURL(wavBlob);
       
       // Show toast with download action
       toast.success(`Export prêt: ${exportFileName}`, {
@@ -219,95 +215,66 @@ export const useAudioExport = (
     }
   }, [audioBuffer, markers, duration, formatTime, getAudioContext, currentAudioFile, audioRef]);
   
-  // Convert AudioBuffer to MP3 format using lamejs library
-  function audioBufferToMp3(buffer: AudioBuffer): Uint8Array[] {
-    try {
-      console.log("Starting MP3 encoding with lamejs...");
-      
-      // Get buffer parameters
-      const channels = buffer.numberOfChannels;
-      const sampleRate = buffer.sampleRate;
-      const samples = buffer.getChannelData(0);
-      
-      // For stereo, get right channel samples
-      const rightChannel = channels > 1 ? buffer.getChannelData(1) : samples;
-      
-      // Set MP3 encoding parameters
-      const bitRate = 192; // 192kbps is a good quality
-      const sampleBlockSize = 1152; // Default MP3 sample block size
-      
-      // Create MP3 encoder - using integer constants instead of enum values
-      // For reference: STEREO = 0, JOINT_STEREO = 1, DUAL_CHANNEL = 2, MONO = 3
-      const mp3encoder = channels > 1 
-        ? new lamejs.Mp3Encoder(2, sampleRate, bitRate) // Stereo
-        : new lamejs.Mp3Encoder(1, sampleRate, bitRate); // Mono
-      
-      const mp3Data: Uint8Array[] = [];
-      
-      if (channels === 1) {
-        // Mono encoding
-        console.log("Encoding MP3 in mono mode");
-        const samplesInt16 = floatTo16BitPCM(samples);
-        let remaining = samplesInt16.length;
-        let offset = 0;
+  // Convert AudioBuffer to WAV format (more reliable than direct MP3 conversion with lamejs)
+  async function audioBufferToWav(buffer: AudioBuffer): Promise<Blob> {
+    const numOfChannels = buffer.numberOfChannels;
+    const length = buffer.length * numOfChannels * 2 + 44;
+    const arrayBuffer = new ArrayBuffer(length);
+    const view = new DataView(arrayBuffer);
+    
+    // RIFF identifier
+    writeString(view, 0, 'RIFF');
+    // RIFF chunk length
+    view.setUint32(4, 36 + buffer.length * numOfChannels * 2, true);
+    // RIFF type
+    writeString(view, 8, 'WAVE');
+    // Format chunk identifier
+    writeString(view, 12, 'fmt ');
+    // Format chunk length
+    view.setUint32(16, 16, true);
+    // Sample format (raw)
+    view.setUint16(20, 1, true);
+    // Channel count
+    view.setUint16(22, numOfChannels, true);
+    // Sample rate
+    view.setUint32(24, buffer.sampleRate, true);
+    // Byte rate (sample rate * block align)
+    view.setUint32(28, buffer.sampleRate * numOfChannels * 2, true);
+    // Block align (channel count * bytes per sample)
+    view.setUint16(32, numOfChannels * 2, true);
+    // Bits per sample
+    view.setUint16(34, 16, true);
+    // Data chunk identifier
+    writeString(view, 36, 'data');
+    // Data chunk length
+    view.setUint32(40, buffer.length * numOfChannels * 2, true);
+    
+    // Write the PCM samples
+    const offset = 44;
+    let idx = offset;
+    const volume = 1;
+    
+    for (let i = 0; i < buffer.length; i++) {
+      for (let channel = 0; channel < numOfChannels; channel++) {
+        // Interleave channels
+        const sample = Math.max(-1, Math.min(1, buffer.getChannelData(channel)[i])) * volume;
+        // Scale to 16-bit signed integer
+        sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
         
-        while (remaining >= sampleBlockSize) {
-          const sampleChunk = samplesInt16.subarray(offset, offset + sampleBlockSize);
-          const mp3buf = mp3encoder.encodeBuffer(sampleChunk);
-          if (mp3buf.length > 0) {
-            mp3Data.push(new Uint8Array(mp3buf));
-          }
-          offset += sampleBlockSize;
-          remaining -= sampleBlockSize;
-        }
-        
-        // Flush the encoder
-        const mp3buf = mp3encoder.flush();
-        if (mp3buf.length > 0) {
-          mp3Data.push(new Uint8Array(mp3buf));
-        }
-      } else {
-        // Stereo encoding
-        console.log("Encoding MP3 in stereo mode");
-        const leftSamplesInt16 = floatTo16BitPCM(samples);
-        const rightSamplesInt16 = floatTo16BitPCM(rightChannel);
-        let remaining = leftSamplesInt16.length;
-        let offset = 0;
-        
-        while (remaining >= sampleBlockSize) {
-          const leftChunk = leftSamplesInt16.subarray(offset, offset + sampleBlockSize);
-          const rightChunk = rightSamplesInt16.subarray(offset, offset + sampleBlockSize);
-          const mp3buf = mp3encoder.encodeBuffer(leftChunk, rightChunk);
-          if (mp3buf.length > 0) {
-            mp3Data.push(new Uint8Array(mp3buf));
-          }
-          offset += sampleBlockSize;
-          remaining -= sampleBlockSize;
-        }
-        
-        // Flush the encoder
-        const mp3buf = mp3encoder.flush();
-        if (mp3buf.length > 0) {
-          mp3Data.push(new Uint8Array(mp3buf));
-        }
+        // Write 16-bit sample
+        view.setInt16(idx, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+        idx += 2;
       }
-      
-      console.log(`MP3 encoding successful - created ${mp3Data.length} chunks`);
-      return mp3Data;
-    } catch (error) {
-      console.error("Error in MP3 encoding:", error);
-      throw new Error(`MP3 encoding failed: ${error.message}`);
     }
+    
+    return new Blob([arrayBuffer], { type: 'audio/wav' });
   }
   
-  // Helper function to convert float audio data to 16-bit PCM
-  function floatTo16BitPCM(input: Float32Array): Int16Array {
-    const output = new Int16Array(input.length);
-    for (let i = 0; i < input.length; i++) {
-      const s = Math.max(-1, Math.min(1, input[i]));
-      output[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+  // Helper function to write strings to DataView
+  function writeString(view: DataView, offset: number, string: string) {
+    for (let i = 0; i < string.length; i++) {
+      view.setUint8(offset + i, string.charCodeAt(i));
     }
-    return output;
   }
 
   return {
