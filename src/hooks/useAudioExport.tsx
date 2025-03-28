@@ -81,21 +81,21 @@ export const useAudioExport = (
               
               const audioBuffer = await newContext.decodeAudioData(arrayBuffer.slice(0));
               console.log("Audio data decoded successfully with new context, duration:", audioBuffer.duration);
-              return audioBuffer;
-            }
-            
-            try {
-              // Create a copy of the buffer to avoid potential issues with buffer reuse
-              const bufferCopy = arrayBuffer.slice(0);
-              
-              // Decode the audio data
-              console.log("Attempting to decode audio data, context state:", audioContext.state);
-              const audioBuffer = await audioContext.decodeAudioData(bufferCopy);
-              console.log("Audio data decoded successfully, duration:", audioBuffer.duration);
               bufferToExport = audioBuffer;
-            } catch (decodeError) {
-              console.error("Error decoding audio data:", decodeError);
-              throw decodeError;
+            } else {
+              try {
+                // Create a copy of the buffer to avoid potential issues with buffer reuse
+                const bufferCopy = arrayBuffer.slice(0);
+                
+                // Decode the audio data
+                console.log("Attempting to decode audio data, context state:", audioContext.state);
+                const audioBuffer = await audioContext.decodeAudioData(bufferCopy);
+                console.log("Audio data decoded successfully, duration:", audioBuffer.duration);
+                bufferToExport = audioBuffer;
+              } catch (decodeError) {
+                console.error("Error decoding audio data:", decodeError);
+                throw decodeError;
+              }
             }
           }
         } catch (error) {
@@ -236,8 +236,8 @@ export const useAudioExport = (
       const bitRate = 192; // 192kbps is a good quality
       const sampleBlockSize = 1152; // Default MP3 sample block size
       
-      // Create MP3 encoder
-      // Using explicit numbers for MP3 modes - JOINT_STEREO = 1, MONO = 3
+      // Create MP3 encoder - using integer constants instead of enum values
+      // For reference: STEREO = 0, JOINT_STEREO = 1, DUAL_CHANNEL = 2, MONO = 3
       const mp3encoder = channels > 1 
         ? new lamejs.Mp3Encoder(2, sampleRate, bitRate) // Stereo
         : new lamejs.Mp3Encoder(1, sampleRate, bitRate); // Mono
