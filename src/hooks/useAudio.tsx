@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useAudioContext } from './useAudioContext';
@@ -18,7 +19,6 @@ export const useAudio = () => {
   const [volume, setVolume] = useState(0.8);
   const [audioSrc, setAudioSrc] = useState<string | null>(null);
   const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
-  const [markers, setMarkers] = useState<AudioMarker[]>([]);
   const [isBuffering, setIsBuffering] = useState(false);
   const [showMarkerControls, setShowMarkerControls] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -33,8 +33,8 @@ export const useAudio = () => {
   const { getAudioContext, isContextReady } = useAudioContext();
   const { formatTime, formatTimeDetailed } = useAudioFormatting();
   
-  // Get the utility function for adding markers
-  const { addMarker: addMarkerUtil } = useAudioMarkers(formatTime);
+  // Get the marker utilities
+  const { markers, addMarker, removeMarker, setMarkers } = useAudioMarkers(formatTime);
   
   // Initialize files management
   const { 
@@ -48,51 +48,11 @@ export const useAudio = () => {
     setAudioBuffer,
     setIsPlaying,
     setCurrentTime,
-    (duration) => {
-      // Don't automatically initialize markers - we'll let the user add them
-      // when they want to edit
-      setDuration(duration);
-    },
+    setDuration,
     getAudioContext,
     audioRef,
     audioSrc
   );
-  
-  // Add marker at current time without moving playback position
-  const addMarker = (type: 'start' | 'end') => {
-    // If we don't have any markers yet and the user adds a marker,
-    // let's automatically add the other one at the appropriate position
-    if (markers.length === 0) {
-      const otherType = type === 'start' ? 'end' : 'start';
-      const otherPosition = type === 'start' ? duration : 0;
-      
-      const otherMarker: AudioMarker = {
-        id: `${otherType}-${Date.now() + 1}`,
-        position: otherPosition,
-        type: otherType as 'start' | 'end'
-      };
-      
-      setMarkers([otherMarker]);
-    }
-    
-    // Important: Don't modify the audio position here
-    // Just add the marker at the current position
-    const filteredMarkers = markers.filter(marker => marker.type !== type);
-    
-    const newMarker: AudioMarker = {
-      id: `${type}-${Date.now()}`,
-      position: currentTime,
-      type
-    };
-    
-    setMarkers([...filteredMarkers, newMarker]);
-    toast.success(`Marqueur ${type === 'start' ? 'début' : 'fin'} défini à ${formatTime(currentTime)}`);
-  };
-  
-  // Remove marker by ID
-  const removeMarker = (id: string) => {
-    setMarkers(markers.filter(marker => marker.id !== id));
-  };
   
   // Initialize audio element if it doesn't exist
   useEffect(() => {
@@ -243,6 +203,27 @@ export const useAudio = () => {
     setVolume(newVolume);
   };
   
+  // Add marker at current time without moving playback position
+  const handleAddMarker = (type: 'start' | 'end', time: number) => {
+    // If we don't have any markers yet and the user adds a marker,
+    // let's automatically add the other one at the appropriate position
+    if (markers.length === 0) {
+      const otherType = type === 'start' ? 'end' : 'start';
+      const otherPosition = type === 'start' ? duration : 0;
+      
+      const otherMarker: AudioMarker = {
+        id: `${otherType}-${Date.now() + 1}`,
+        position: otherPosition,
+        type: otherType as 'start' | 'end'
+      };
+      
+      setMarkers([otherMarker]);
+    }
+    
+    // Add the marker at the specified time without changing playback position
+    addMarker(type, time);
+  };
+  
   // Update time display from audio element
   useEffect(() => {
     const audio = audioRef.current;
@@ -384,15 +365,16 @@ export const useAudio = () => {
       
       setExportProgress(70);
       
-      // Convert to MP3 using lamejs - Fixed approach to avoid MPEGMode issue
+      // Fixed approach for MP3 encoding
       const channels = renderedBuffer.numberOfChannels;
       const sampleRate = renderedBuffer.sampleRate;
       
-      // Create the MP3 encoder - IMPORTANT: don't use any MPEGMode parameters
+      // Create the MP3 encoder with explicit simple parameters
+      // Avoid MPEGMode enumeration which caused issues
       const mp3encoder = new lamejs.Mp3Encoder(channels, sampleRate, 192);
       
       const mp3Data = [];
-      const sampleBlockSize = 1152; // Must be 1152 for MP3
+      const sampleBlockSize = 1152; // Standard MP3 frame size
       
       const left = renderedBuffer.getChannelData(0);
       const right = channels > 1 ? renderedBuffer.getChannelData(1) : renderedBuffer.getChannelData(0);
@@ -413,8 +395,8 @@ export const useAudio = () => {
         for (let j = 0; j < sampleBlockSize; j++) {
           if (i + j < totalSamples) {
             // Convert float samples (-1.0 to 1.0) to int16 (-32768 to 32767)
-            leftChunk[j] = Math.max(-32768, Math.min(32767, Math.round(left[i + j] * 32768)));
-            rightChunk[j] = Math.max(-32768, Math.min(32767, Math.round(right[i + j] * 32768)));
+            leftChunk[j] = Math.max(-32768, Math.min(32767, Math.round(left[i + j] * 32767)));
+            rightChunk[j] = Math.max(-32768, Math.min(32767, Math.round(right[i + j] * 32767)));
           } else {
             // Fill remaining samples with silence
             leftChunk[j] = 0;
@@ -422,6 +404,7 @@ export const useAudio = () => {
           }
         }
         
+        // Encode the chunk to MP3
         const mp3buf = mp3encoder.encodeBuffer(leftChunk, rightChunk);
         if (mp3buf.length > 0) {
           mp3Data.push(mp3buf);
@@ -492,7 +475,7 @@ export const useAudio = () => {
     togglePlay,
     seek,
     changeVolume,
-    addMarker,
+    addMarker: handleAddMarker,
     removeMarker,
     exportTrimmedAudio,
     loadAudioFile,
