@@ -1,6 +1,6 @@
 
 import { Button } from "@/components/ui/button";
-import { FileDown } from "lucide-react";
+import { FileDown, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { AudioMarker } from "@/hooks/useAudio";
 import {
@@ -9,6 +9,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Progress } from "@/components/ui/progress";
 
 interface AudioExporterProps {
   markers: AudioMarker[];
@@ -26,6 +27,8 @@ export const AudioExporter = ({
   isExporting,
   formatTimeDetailed,
   canExport,
+  exportProgress = 0,
+  exportError = null,
 }: AudioExporterProps) => {
   const startMarker = markers.find((marker) => marker.type === "start");
   const endMarker = markers.find((marker) => marker.type === "end");
@@ -55,22 +58,40 @@ export const AudioExporter = ({
           <TooltipTrigger asChild>
             <div>
               <Button
-                disabled={true}
-                className="w-full opacity-50 cursor-not-allowed"
+                onClick={onExport}
+                disabled={!canExport || isExporting}
+                className="w-full"
               >
-                <FileDown className="h-4 w-4 mr-2" />
-                Export désactivé
-                <Badge variant="outline" className="ml-2">
-                  Indisponible
-                </Badge>
+                {isExporting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Export en cours...
+                  </>
+                ) : (
+                  <>
+                    <FileDown className="h-4 w-4 mr-2" />
+                    Exporter la sélection
+                  </>
+                )}
               </Button>
-              <div className="text-xs text-amber-700 mt-1">
-                La fonctionnalité d'export a été désactivée
-              </div>
+              
+              {isExporting && exportProgress > 0 && (
+                <Progress 
+                  value={exportProgress} 
+                  className="h-2 mt-2" 
+                  indicatorClassName="bg-primary"
+                />
+              )}
+              
+              {exportError && (
+                <div className="text-xs text-destructive mt-1">
+                  {exportError}
+                </div>
+              )}
             </div>
           </TooltipTrigger>
           <TooltipContent side="top">
-            <p>La fonctionnalité d'export a été temporairement désactivée</p>
+            <p>Exporter la sélection en fichier MP3</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>

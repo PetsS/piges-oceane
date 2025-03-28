@@ -5,7 +5,9 @@ import { useAudioContext } from './useAudioContext';
 import { useAudioFormatting } from './useAudioFormatting';
 import { useAudioPlayback } from './useAudioPlayback';
 import { useAudioFiles } from './useAudioFiles';
+import { useAudioMarkers } from './useAudioMarkers';
 import { AudioMarker, AudioFile } from './useAudioTypes';
+import lamejs from 'lamejs';
 
 export type { AudioMarker, AudioFile };
 
@@ -295,11 +297,195 @@ export const useAudio = () => {
     };
   }, []);
 
-  // Placeholder function that always returns false to disable export
-  const exportTrimmedAudio = () => {
-    toast.info("Fonction d'export désactivée", {
-      description: "La fonctionnalité d'export a été désactivée temporairement."
-    });
+  // Export trimmed audio using lamejs
+  const exportTrimmedAudio = async () => {
+    const startMarker = markers.find(marker => marker.type === 'start');
+    const endMarker = markers.find(marker => marker.type === 'end');
+    
+    if (!startMarker || !endMarker) {
+      toast.error("Les marqueurs de début et de fin doivent être définis");
+      return;
+    }
+    
+    if (startMarker.position >= endMarker.position) {
+      toast.error("Le marqueur de début doit être avant le marqueur de fin");
+      return;
+    }
+    
+    if (!audioRef.current && !audioBuffer) {
+      toast.error("Aucun fichier audio chargé");
+      return;
+    }
+    
+    setIsExporting(true);
+    setExportProgress(0);
+    setExportError(null);
+    
+    try {
+      const ctx = getAudioContext();
+      if (!ctx) {
+        throw new Error("Impossible d'accéder au contexte audio");
+      }
+      
+      const startTime = startMarker.position;
+      const endTime = endMarker.position;
+      const duration = endTime - startTime;
+      
+      // Create offline audio context for processing
+      const offlineCtx = new OfflineAudioContext(
+        2, // stereo
+        Math.ceil(duration * ctx.sampleRate),
+        ctx.sampleRate
+      );
+      
+      // Get audio data - either from audio element or from existing buffer
+      let sourceBuffer: AudioBuffer;
+      
+      if (audioBuffer) {
+        // Use existing buffer
+        sourceBuffer = audioBuffer;
+      } else {
+        // Need to fetch and decode the audio
+        const audioElement = audioRef.current;
+        if (!audioElement || !audioElement.src) {
+          throw new Error("Source audio non disponible");
+        }
+        
+        setExportProgress(5);
+        
+        // Fetch the audio file
+        const response = await fetch(audioElement.src);
+        const arrayBuffer = await response.arrayBuffer();
+        
+        setExportProgress(20);
+        
+        // Decode the audio data
+        sourceBuffer = await ctx.decodeAudioData(arrayBuffer);
+        setExportProgress(40);
+      }
+      
+      // Create buffer source
+      const source = offlineCtx.createBufferSource();
+      source.buffer = sourceBuffer;
+      
+      // Connect source to offline context
+      source.connect(offlineCtx.destination);
+      
+      // Start the source at the appropriate offset
+      source.start(0, startTime, duration);
+      
+      setExportProgress(50);
+      
+      // Render the audio
+      const renderedBuffer = await offlineCtx.startRendering();
+      
+      setExportProgress(70);
+      
+      // Convert to MP3 using lamejs
+      const mp3Encoder = new lamejs.Mp3Encoder(
+        renderedBuffer.numberOfChannels,
+        renderedBuffer.sampleRate,
+        192 // bitrate
+      );
+      
+      const mp3Data = [];
+      const sampleBlockSize = 1152; // Must be a multiple of 576 for lamejs
+      
+      // Process each channel
+      for (let i = 0; i < renderedBuffer.length; i += sampleBlockSize) {
+        // Update progress periodically
+        if (i % (sampleBlockSize * 10) === 0) {
+          const progress = 70 + Math.min(25, (i / renderedBuffer.length) * 25);
+          setExportProgress(progress);
+        }
+        
+        // Create samples arrays for processing
+        const leftSamples = new Int16Array(sampleBlockSize);
+        const rightSamples = new Int16Array(sampleBlockSize);
+        
+        // Get channel data
+        const leftChannel = renderedBuffer.getChannelData(0);
+        const rightChannel = renderedBuffer.numberOfChannels > 1 
+          ? renderedBuffer.getChannelData(1) 
+          : renderedBuffer.getChannelData(0); // Mono to stereo if needed
+        
+        // Fill sample blocks and convert float32 to int16
+        for (let j = 0; j < sampleBlockSize; j++) {
+          if (i + j < renderedBuffer.length) {
+            // Convert float (-1 to 1) to int16 (-32768 to 32767)
+            leftSamples[j] = Math.min(1, Math.max(-1, leftChannel[i + j])) * 32767;
+            rightSamples[j] = Math.min(1, Math.max(-1, rightChannel[i + j])) * 32767;
+          } else {
+            // Pad with silence if we're at the end
+            leftSamples[j] = 0;
+            rightSamples[j] = 0;
+          }
+        }
+        
+        // Encode this chunk
+        const mp3buf = mp3Encoder.encodeBuffer(leftSamples, rightSamples);
+        if (mp3buf.length > 0) {
+          mp3Data.push(mp3buf);
+        }
+      }
+      
+      // Get the final part of the mp3
+      const mp3buf = mp3Encoder.flush();
+      if (mp3buf.length > 0) {
+        mp3Data.push(mp3buf);
+      }
+      
+      setExportProgress(95);
+      
+      // Combine the mp3 data into a single Uint8Array
+      let mp3Size = 0;
+      for (let i = 0; i < mp3Data.length; i++) {
+        mp3Size += mp3Data[i].length;
+      }
+      
+      const mp3Result = new Uint8Array(mp3Size);
+      let offset = 0;
+      for (let i = 0; i < mp3Data.length; i++) {
+        mp3Result.set(mp3Data[i], offset);
+        offset += mp3Data[i].length;
+      }
+      
+      // Create blob and download
+      const blob = new Blob([mp3Result], { type: 'audio/mp3' });
+      const url = URL.createObjectURL(blob);
+      
+      // Create and trigger download
+      const fileName = currentAudioFile 
+        ? `${currentAudioFile.name.replace(/\.[^/.]+$/, '')}_trim.mp3`
+        : `audio_trim_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.mp3`;
+      
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      
+      // Clean up
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        setExportProgress(100);
+        toast.success("Export réussi");
+        
+        // Reset export state after a moment
+        setTimeout(() => {
+          setIsExporting(false);
+          setExportProgress(0);
+        }, 1000);
+      }, 100);
+      
+    } catch (error) {
+      console.error("Error exporting audio:", error);
+      setExportError(`Erreur: ${error.message || "Échec de l'export"}`);
+      toast.error(`Erreur lors de l'export: ${error.message || "Échec de l'export"}`);
+      setIsExporting(false);
+    }
   };
   
   return {
@@ -314,9 +500,9 @@ export const useAudio = () => {
     currentAudioFile,
     isBuffering,
     showMarkerControls,
-    isExporting: false, // Always false since we've removed export functionality
-    exportProgress: 0,
-    exportError: null,
+    isExporting,
+    exportProgress,
+    exportError,
     setShowMarkerControls,
     togglePlay,
     seek,
