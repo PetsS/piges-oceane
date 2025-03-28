@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useAudioContext } from './useAudioContext';
@@ -308,7 +307,7 @@ export const useAudio = () => {
     };
   }, []);
 
-  // Export trimmed audio using the original file format
+  // Export trimmed audio with marker timestamps in filename
   const exportTrimmedAudio = async () => {
     const startMarker = markers.find(marker => marker.type === 'start');
     const endMarker = markers.find(marker => marker.type === 'end');
@@ -352,6 +351,10 @@ export const useAudio = () => {
       const endTime = endMarker.position;
       const duration = endTime - startTime;
       
+      // Format start and end times for filename
+      const startTimeFormatted = formatTime(startTime).replace(':', 'm') + 's';
+      const endTimeFormatted = formatTime(endTime).replace(':', 'm') + 's';
+      
       // Determine file type from original source
       const originalFileType = currentAudioFile ? 
         (currentAudioFile.name.toLowerCase().endsWith('.wav') ? 'audio/wav' : 'audio/mpeg') : 
@@ -381,28 +384,16 @@ export const useAudio = () => {
           
           // Determine the best MIME type for recording
           const getMimeType = () => {
-            // First check specific format support
-            if (originalFileType === 'audio/wav' && MediaRecorder.isTypeSupported('audio/wav')) {
-              return 'audio/wav';
-            } else if (originalFileType === 'audio/mpeg' && MediaRecorder.isTypeSupported('audio/mpeg')) {
-              return 'audio/mpeg';
+            // For compatibility reasons, use webm as fallback
+            if (MediaRecorder.isTypeSupported('audio/webm')) {
+              return 'audio/webm';
             }
             
-            // Fallbacks in order of preference
-            const types = [
-              'audio/webm',
-              'audio/webm;codecs=opus',
-              'audio/ogg',
-              'audio/ogg;codecs=opus'
-            ];
-            
-            for (const type of types) {
-              if (MediaRecorder.isTypeSupported(type)) {
-                return type;
-              }
+            if (MediaRecorder.isTypeSupported('audio/mp4')) {
+              return 'audio/mp4';
             }
             
-            // Last resort
+            // Return empty string to let the browser decide
             return '';
           };
           
@@ -433,10 +424,10 @@ export const useAudio = () => {
             const blob = new Blob(chunks, { type: mimeType || originalFileType });
             const url = URL.createObjectURL(blob);
             
-            // Trigger download
+            // Include marker timestamps in filename
             const fileName = currentAudioFile 
-              ? `${currentAudioFile.name.replace(/\.[^/.]+$/, '')}_trim${fileExt}`
-              : `audio_trim_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}${fileExt}`;
+              ? `${currentAudioFile.name.replace(/\.[^/.]+$/, '')}_${startTimeFormatted}_${endTimeFormatted}${fileExt}`
+              : `audio_trim_${startTimeFormatted}_${endTimeFormatted}${fileExt}`;
             
             setExportProgress(95);
             
@@ -476,8 +467,8 @@ export const useAudio = () => {
             }, 100);
           };
           
-          // Start recording
-          mediaRecorder.start(100); // Collect data in 100ms chunks
+          // Start recording - use small chunk size for better memory usage
+          mediaRecorder.start(100);
           setExportProgress(45);
           toast.info("Enregistrement en cours...");
           
