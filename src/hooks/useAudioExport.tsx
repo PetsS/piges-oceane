@@ -16,59 +16,106 @@ export const useAudioExport = (
   const processingRef = useRef<boolean>(false);
   const { getAudioContext } = useAudioContext();
 
-  const bufferToWav = useCallback((buffer: AudioBuffer): Promise<Blob> => {
+  const bufferToMp3 = useCallback((buffer: AudioBuffer, bitRate: number = 192): Promise<Blob> => {
     return new Promise((resolve) => {
-      const numOfChannels = Math.min(buffer.numberOfChannels, 2);
-      const length = buffer.length * numOfChannels * 2;
+      console.log(`Encoding audio to MP3 at ${bitRate}kbps`);
+      
+      const channels = Math.min(buffer.numberOfChannels, 2); // MP3 supports max 2 channels
       const sampleRate = buffer.sampleRate;
       
-      const wavBuffer = new ArrayBuffer(44 + length);
-      const view = new DataView(wavBuffer);
+      // Create MP3 encoder
+      const mp3encoder = new lamejs.Mp3Encoder(channels, sampleRate, bitRate);
+      const mp3Data: Int8Array[] = [];
       
-      const writeString = (view: DataView, offset: number, string: string) => {
-        for (let i = 0; i < string.length; i++) {
-          view.setUint8(offset + i, string.charCodeAt(i));
-        }
+      // Sample block size (recommended by lamejs)
+      const sampleBlockSize = 1152;
+      
+      // Function to encode a batch of samples
+      const encodeSamples = (start: number, end: number, channel: number) => {
+        const samples = new Float32Array(end - start);
+        buffer.copyFromChannel(samples, channel, start);
+        return samples;
       };
       
-      writeString(view, 0, 'RIFF');
-      view.setUint32(4, 36 + length, true);
-      writeString(view, 8, 'WAVE');
-      writeString(view, 12, 'fmt ');
-      view.setUint32(16, 16, true);
-      view.setUint16(20, 1, true);
-      view.setUint16(22, numOfChannels, true);
-      view.setUint32(24, sampleRate, true);
-      view.setUint32(28, sampleRate * numOfChannels * 2, true);
-      view.setUint16(32, numOfChannels * 2, true);
-      view.setUint16(34, 16, true);
-      writeString(view, 36, 'data');
-      view.setUint32(40, length, true);
+      console.log(`Processing audio buffer: ${buffer.length} samples, ${channels} channels, ${sampleRate}Hz`);
       
-      const offset = 44;
-      let pos = offset;
-      
+      // Process in chunks to avoid memory issues
       const chunkSize = 10000;
+      let offset = 0;
       
-      for (let i = 0; i < buffer.length; i += chunkSize) {
-        const blockSize = Math.min(chunkSize, buffer.length - i);
+      while (offset < buffer.length) {
+        const sampleChunkSize = Math.min(chunkSize, buffer.length - offset);
         
-        for (let j = 0; j < blockSize; j++) {
-          for (let channel = 0; channel < numOfChannels; channel++) {
-            const sample = buffer.getChannelData(channel)[i + j];
-            const int = Math.max(-1, Math.min(1, sample)) * 0x7FFF;
-            view.setInt16(pos, int, true);
-            pos += 2;
+        // Create sample arrays for mp3 encoding
+        const leftData = encodeSamples(offset, offset + sampleChunkSize, 0);
+        
+        let rightData: Float32Array | null = null;
+        if (channels > 1) {
+          rightData = encodeSamples(offset, offset + sampleChunkSize, 1);
+        }
+        
+        // Process the current chunk in smaller blocks (as required by lamejs)
+        for (let i = 0; i < sampleChunkSize; i += sampleBlockSize) {
+          const blockSize = Math.min(sampleBlockSize, sampleChunkSize - i);
+          
+          // Convert float audio data to short (16-bit) integers
+          const leftChunk = new Int16Array(blockSize);
+          const rightChunk = new Int16Array(blockSize);
+          
+          for (let j = 0; j < blockSize; j++) {
+            // Convert float [-1.0, 1.0] to int [-32768, 32767]
+            const left = Math.max(-1, Math.min(1, leftData[i + j]));
+            leftChunk[j] = left < 0 ? left * 32768 : left * 32767;
+            
+            if (rightData) {
+              const right = Math.max(-1, Math.min(1, rightData[i + j]));
+              rightChunk[j] = right < 0 ? right * 32768 : right * 32767;
+            } else {
+              // If mono, use the same data for both channels
+              rightChunk[j] = leftChunk[j];
+            }
+          }
+          
+          // Encode this block
+          let mp3buf;
+          if (channels === 1) {
+            mp3buf = mp3encoder.encodeBuffer(leftChunk);
+          } else {
+            mp3buf = mp3encoder.encodeBuffer(leftChunk, rightChunk);
+          }
+          
+          if (mp3buf && mp3buf.length > 0) {
+            mp3Data.push(mp3buf);
           }
         }
+        
+        offset += sampleChunkSize;
       }
       
-      const blob = new Blob([wavBuffer], { type: 'audio/wav' });
+      // Finalize the MP3 encoding
+      const end = mp3encoder.flush();
+      if (end && end.length > 0) {
+        mp3Data.push(end);
+      }
+      
+      // Calculate total MP3 data length
+      const totalLength = mp3Data.reduce((acc, buffer) => acc + buffer.length, 0);
+      console.log(`MP3 encoding complete, total size: ${totalLength} bytes`);
+      
+      // Combine all MP3 data chunks
+      const mp3Buffer = new Int8Array(totalLength);
+      let offset2 = 0;
+      for (const data of mp3Data) {
+        mp3Buffer.set(data, offset2);
+        offset2 += data.length;
+      }
+      
+      // Create blob from the MP3 buffer
+      const blob = new Blob([mp3Buffer], { type: 'audio/mp3' });
       resolve(blob);
     });
   }, []);
 
-  // Skip MP3 encoding and always use WAV format for simplicity and reliability
   const exportTrimmedAudio = useCallback(async () => {
     if (processingRef.current) {
       toast.info('Traitement en cours, veuillez patienter...');
@@ -204,12 +251,13 @@ export const useAudioExport = (
         }
       }
       
-      console.log("Trimmed buffer created successfully, proceeding to WAV export");
+      console.log("Trimmed buffer created successfully, proceeding to MP3 export");
       
-      // We're using WAV format only as it's more reliable
-      const fileExtension = "wav";
+      // Using MP3 format at 192kbps
+      const fileExtension = "mp3";
+      const bitRate = 192;  // kbps
       
-      const trimmedAudioBlob = await bufferToWav(trimmedBuffer);
+      const trimmedAudioBlob = await bufferToMp3(trimmedBuffer, bitRate);
       
       console.log(`Successfully encoded to ${fileExtension}, blob size: ${trimmedAudioBlob.size} bytes`);
       
@@ -222,7 +270,7 @@ export const useAudioExport = (
       
       // Show toast with download action
       toast.success(`Export prêt: ${exportFileName}`, {
-        description: `Découpé de ${formatTime(startTime)} à ${formatTime(endTime)} (${fileExtension.toUpperCase()})`,
+        description: `Découpé de ${formatTime(startTime)} à ${formatTime(endTime)} (${fileExtension.toUpperCase()} ${bitRate}k)`,
         action: {
           label: 'Télécharger',
           onClick: () => {
@@ -254,7 +302,7 @@ export const useAudioExport = (
     } finally {
       processingRef.current = false;
     }
-  }, [audioBuffer, markers, duration, formatTime, getAudioContext, currentAudioFile, bufferToWav, audioRef]);
+  }, [audioBuffer, markers, duration, formatTime, getAudioContext, currentAudioFile, bufferToMp3, audioRef]);
 
   return {
     exportTrimmedAudio

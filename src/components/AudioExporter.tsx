@@ -66,7 +66,7 @@ export const AudioExporter = ({
           </div>
           <div>
             <Badge variant="outline" className="text-xs">
-              WAV
+              MP3 192k
             </Badge>
           </div>
         </div>
@@ -103,7 +103,7 @@ export const AudioExporter = ({
             <p>
               {!canExport
                 ? "Définissez les marqueurs de début et de fin"
-                : "Découper et exporter la section audio sélectionnée (WAV format)"}
+                : "Découper et exporter la section audio sélectionnée (MP3 format, 192 kbps)"}
             </p>
           </TooltipContent>
         </Tooltip>
