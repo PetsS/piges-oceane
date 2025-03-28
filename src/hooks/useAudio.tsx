@@ -223,10 +223,9 @@ export const useAudio = () => {
   };
   
   // Add marker at current time without moving playback position
-  const handleAddMarker = (type: 'start' | 'end') => {
-    // Store current playback state and position
-    const wasPlaying = isPlaying;
-    const currentPosition = currentTime;
+  const handleAddMarker = (type: 'start' | 'end', time: number) => {
+    // Important: We now use the provided time parameter instead of currentTime
+    const markerPosition = time;
     
     // If we don't have any markers yet and the user adds a marker,
     // let's automatically add the other one at the appropriate position
@@ -243,11 +242,10 @@ export const useAudio = () => {
       setMarkers([otherMarker]);
     }
     
-    // Add the marker at the current time without changing playback position
-    addMarker(type, currentPosition);
+    // Add the marker at the specified position
+    addMarker(type, markerPosition);
     
-    // Don't change the current playback position or state
-    toast.success(`Marqueur ${type === 'start' ? 'début' : 'fin'} défini à ${formatTime(currentPosition)}`);
+    toast.success(`Marqueur ${type === 'start' ? 'début' : 'fin'} défini à ${formatTime(markerPosition)}`);
   };
   
   // Update time display from audio element
@@ -382,28 +380,15 @@ export const useAudio = () => {
           
           setExportProgress(35);
           
-          // Determine the best MIME type for recording
-          const getMimeType = () => {
-            // For compatibility reasons, use webm as fallback
-            if (MediaRecorder.isTypeSupported('audio/webm')) {
-              return 'audio/webm';
-            }
-            
-            if (MediaRecorder.isTypeSupported('audio/mp4')) {
-              return 'audio/mp4';
-            }
-            
-            // Return empty string to let the browser decide
-            return '';
-          };
-          
-          const mimeType = getMimeType();
+          // Always use WebM format for maximum compatibility
+          const mimeType = 'audio/webm';
           console.log("Using MIME type for export:", mimeType);
           
+          // Get appropriate file extension
+          const fileExt = originalFileType === 'audio/wav' ? '.wav' : '.mp3';
+          
           // Create MediaRecorder with appropriate options
-          const mediaRecorder = mimeType ? 
-            new MediaRecorder(destination.stream, { mimeType }) : 
-            new MediaRecorder(destination.stream);
+          const mediaRecorder = new MediaRecorder(destination.stream, { mimeType });
           
           const chunks: Blob[] = [];
           
@@ -417,11 +402,8 @@ export const useAudio = () => {
             setExportProgress(85);
             toast.info("Finalisation de l'export...");
             
-            // Get appropriate file extension
-            const fileExt = originalFileType === 'audio/wav' ? '.wav' : '.mp3';
-            
             // Create the blob from all chunks
-            const blob = new Blob(chunks, { type: mimeType || originalFileType });
+            const blob = new Blob(chunks, { type: mimeType });
             const url = URL.createObjectURL(blob);
             
             // Include marker timestamps in filename
@@ -467,8 +449,8 @@ export const useAudio = () => {
             }, 100);
           };
           
-          // Start recording - use small chunk size for better memory usage
-          mediaRecorder.start(100);
+          // Start recording - use smaller chunk size for better memory usage
+          mediaRecorder.start(50);
           setExportProgress(45);
           toast.info("Enregistrement en cours...");
           
