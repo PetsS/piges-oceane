@@ -72,7 +72,9 @@ export const AudioExporter = ({
               <Button
                 disabled={!canExport || (isExporting && !showRetry)}
                 onClick={onExport}
-                className={`w-full transition-all duration-300 hover:shadow-md hover:translate-y-[-1px] ${exportError ? 'bg-red-500 hover:bg-red-600' : ''}`}
+                className={`w-full transition-all duration-300 hover:shadow-md hover:translate-y-[-1px] ${
+                  exportError ? 'bg-amber-500 hover:bg-amber-600' : ''
+                }`}
               >
                 {isExporting ? (
                   <Scissors className="h-4 w-4 mr-2 animate-pulse" />
@@ -83,8 +85,8 @@ export const AudioExporter = ({
                 )}
                 {isExporting 
                   ? `Encodage MP3... ${Math.round(exportProgress)}%` 
-                  : exportError 
-                    ? "Réessayer l'export" 
+                  : exportError?.includes("being rebuilt")
+                    ? "Export en cours de reconstruction" 
                     : "Exporter l'audio"}
                 
                 {isExporting && (
@@ -99,8 +101,10 @@ export const AudioExporter = ({
               )}
               
               {exportError && !isExporting && (
-                <div className="text-xs text-red-500 mt-1">
-                  Erreur: {exportError}
+                <div className="text-xs text-amber-700 mt-1">
+                  {exportError?.includes("being rebuilt") 
+                    ? "Cette fonctionnalité est en cours de refactorisation" 
+                    : `Erreur: ${exportError}`}
                 </div>
               )}
             </div>
@@ -109,8 +113,8 @@ export const AudioExporter = ({
             <p>
               {!canExport
                 ? "Définissez les marqueurs de début et de fin"
-                : exportError
-                ? "Une erreur s'est produite. Cliquez pour réessayer."
+                : exportError?.includes("being rebuilt")
+                ? "La fonctionnalité d'export est en cours de reconstruction"
                 : "Découper et exporter la section audio sélectionnée (format MP3)"}
             </p>
           </TooltipContent>
