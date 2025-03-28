@@ -24,17 +24,10 @@ export const useAudioExport = (
       const numChannels = Math.min(buffer.numberOfChannels, 2); // MP3 supports max 2 channels
       const sampleRate = buffer.sampleRate;
       
-      // Use correct mode constants - lamejs exports these directly
-      const mode = numChannels === 1 ? 3 : 1; // 3 = MONO, 1 = JOINT_STEREO
+      console.log(`Creating MP3 encoder with ${numChannels} channels at ${sampleRate}Hz, bitrate: ${bitRate}kbps`);
       
-      console.log(`Using MP3 mode: ${mode === 3 ? 'mono' : 'joint stereo'}`);
-      
-      // Create MP3 encoder with proper mode setup
-      const mp3encoder = new lamejs.Mp3Encoder(
-        numChannels, // number of channels
-        sampleRate,  // sample rate
-        bitRate      // bitrate
-      );
+      // Create MP3 encoder - lamejs requires channel count, sample rate, and bitrate
+      const mp3encoder = new lamejs.Mp3Encoder(numChannels, sampleRate, bitRate);
       
       // Array to hold MP3 data chunks
       const mp3Data: Int8Array[] = [];
@@ -61,7 +54,7 @@ export const useAudioExport = (
           
           // Create sample arrays for current block
           const leftPcm = new Int16Array(currentBlockSize);
-          const rightPcm = new Int16Array(currentBlockSize);
+          const rightPcm = numChannels > 1 ? new Int16Array(currentBlockSize) : null;
           
           // Fill PCM arrays with audio data (converting float to int)
           for (let k = 0; k < currentBlockSize; k++) {
@@ -71,12 +64,9 @@ export const useAudioExport = (
               const leftSample = Math.max(-1, Math.min(1, leftChannel[i + j + k]));
               leftPcm[k] = leftSample < 0 ? leftSample * 32768 : leftSample * 32767;
               
-              if (rightChannel) {
+              if (rightChannel && rightPcm) {
                 const rightSample = Math.max(-1, Math.min(1, rightChannel[i + j + k]));
                 rightPcm[k] = rightSample < 0 ? rightSample * 32768 : rightSample * 32767;
-              } else {
-                // If mono, use the same data for right channel
-                rightPcm[k] = leftPcm[k];
               }
             }
           }
@@ -85,7 +75,7 @@ export const useAudioExport = (
           let mp3buf;
           if (numChannels === 1) {
             mp3buf = mp3encoder.encodeBuffer(leftPcm);
-          } else {
+          } else if (rightPcm) {
             mp3buf = mp3encoder.encodeBuffer(leftPcm, rightPcm);
           }
           
