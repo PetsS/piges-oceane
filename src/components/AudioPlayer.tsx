@@ -1,7 +1,7 @@
+
 import { useState, useCallback, memo, useEffect, useRef } from "react";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { 
   Play, 
   Pause, 
@@ -11,14 +11,8 @@ import {
   Music,
   ChevronsLeft,
   ChevronsRight,
-  Loader2,
-  ArrowLeftToLine,
-  ArrowRightToLine
+  Loader2
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { AudioMarker } from "@/hooks/useAudioTypes";
-import { toast } from "sonner";
-import { MarkerControls } from "./MarkerControls";
 
 interface AudioPlayerProps {
   isPlaying: boolean;
@@ -29,17 +23,12 @@ interface AudioPlayerProps {
   onVolumeChange: (value: number) => void;
   onSeek: (time: number) => void;
   formatTime: (time: number) => string;
-  formatTimeDetailed?: (time: number) => string;
   audioTitle?: string;
   isLoading?: boolean;
   isBuffering?: boolean;
-  markers?: AudioMarker[];
-  onAddMarker?: (type: 'start' | 'end', time: number) => void;
-  onExport?: () => void;
-  isExporting?: boolean;
-  exportProgress?: number;
 }
 
+// Use memo to prevent unnecessary re-renders
 export const AudioPlayer = memo(({
   isPlaying,
   currentTime,
@@ -49,28 +38,17 @@ export const AudioPlayer = memo(({
   onVolumeChange,
   onSeek,
   formatTime,
-  formatTimeDetailed = formatTime,
   audioTitle = "Aucun audio chargé",
   isLoading = false,
   isBuffering = false,
-  markers = [],
-  onAddMarker,
-  onExport,
-  isExporting = false,
-  exportProgress = 0,
 }: AudioPlayerProps) => {
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
   const [playbackEnabled, setPlaybackEnabled] = useState(false);
-  const [showMarkerControls, setShowMarkerControls] = useState(false);
   const playButtonRef = useRef<HTMLButtonElement>(null);
   
   const playbackPercentage = duration > 0 ? (currentTime / duration) * 100 : 0;
   
-  const startMarker = markers.find(marker => marker.type === 'start');
-  const endMarker = markers.find(marker => marker.type === 'end');
-  
-  const canExport = startMarker && endMarker && startMarker.position < endMarker.position;
-  
+  // Enable playback controls once audio is loaded
   useEffect(() => {
     if (duration > 0 && !isLoading) {
       setPlaybackEnabled(true);
@@ -97,31 +75,25 @@ export const AudioPlayer = memo(({
     return <Volume2 className="h-5 w-5" />;
   }, [volume]);
 
+  // Handle play/pause with improved error handling
   const handlePlayPause = useCallback(() => {
     try {
       console.log("Play/pause button clicked");
       
+      // Focus the button to trigger any potential user interaction handlers
       if (playButtonRef.current) {
         playButtonRef.current.focus();
       }
       
+      // Call the provided play/pause handler
       onPlayPause();
       
+      // Add visual feedback
       setTimeout(() => playButtonRef.current?.blur(), 100);
     } catch (error) {
       console.error("Error in play/pause handler:", error);
     }
   }, [onPlayPause]);
-
-  const handleAddMarker = useCallback((type: 'start' | 'end') => {
-    if (onAddMarker) {
-      onAddMarker(type, currentTime);
-    }
-  }, [onAddMarker, currentTime]);
-
-  const toggleMarkerControls = useCallback(() => {
-    setShowMarkerControls(prev => !prev);
-  }, []);
 
   return (
     <div className="glass-panel rounded-lg p-4 animate-fade-in">
@@ -164,17 +136,6 @@ export const AudioPlayer = memo(({
               </div>
             )}
           </div>
-          
-          {duration > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={toggleMarkerControls}
-              className={showMarkerControls ? "bg-primary/10" : ""}
-            >
-              {showMarkerControls ? "Masquer marqueurs" : "Afficher marqueurs"}
-            </Button>
-          )}
         </div>
       </div>
       
@@ -235,20 +196,6 @@ export const AudioPlayer = memo(({
           </Button>
         </div>
       </div>
-      
-      {showMarkerControls && (
-        <div className="mt-6 space-y-4 border-t pt-4">
-          <MarkerControls 
-            markers={markers}
-            onAddMarker={handleAddMarker}
-            onExport={onExport}
-            currentTime={currentTime}
-            formatTimeDetailed={formatTimeDetailed}
-            isExporting={isExporting}
-            exportProgress={exportProgress}
-          />
-        </div>
-      )}
     </div>
   );
 });

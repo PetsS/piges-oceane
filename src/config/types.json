@@ -2,10 +2,10 @@
 [
   {
     "displayName": "Départs",
-    "folderName": "Départs"
+    "folderName": "departs"
   },
   {
     "displayName": "Retours",
-    "folderName": "Retours"
+    "folderName": "retours"
   }
 ]

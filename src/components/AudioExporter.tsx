@@ -1,8 +1,8 @@
 
 import { Button } from "@/components/ui/button";
-import { FileDown, Loader2 } from "lucide-react";
+import { Scissors, FileDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { AudioMarker } from "@/hooks/useAudioTypes";
+import { AudioMarker } from "@/hooks/useAudio";
 import {
   Tooltip,
   TooltipContent,
@@ -18,8 +18,6 @@ interface AudioExporterProps {
   isExporting: boolean;
   formatTimeDetailed: (time: number) => string;
   canExport: boolean;
-  exportProgress?: number;
-  exportError?: string | null;
 }
 
 export const AudioExporter = ({
@@ -28,29 +26,31 @@ export const AudioExporter = ({
   isExporting,
   formatTimeDetailed,
   canExport,
-  exportProgress = 0,
-  exportError = null,
 }: AudioExporterProps) => {
   const startMarker = markers.find((marker) => marker.type === "start");
   const endMarker = markers.find((marker) => marker.type === "end");
-  
-  // Add a display message for the export process
-  const [exportMessage, setExportMessage] = useState("Export en cours...");
-  
-  // Update the export message based on progress
+  const [progress, setProgress] = useState(0);
+
+  // Simulate progress when exporting
   useEffect(() => {
     if (isExporting) {
-      if (exportProgress < 20) {
-        setExportMessage("Préparation de l'export...");
-      } else if (exportProgress < 50) {
-        setExportMessage("Traitement audio...");
-      } else if (exportProgress < 90) {
-        setExportMessage("Finalisation...");
-      } else {
-        setExportMessage("Téléchargement...");
-      }
+      setProgress(0);
+      const interval = setInterval(() => {
+        setProgress((prev) => {
+          const newValue = prev + (2 + Math.random() * 3);
+          return newValue < 95 ? newValue : 95;
+        });
+      }, 200);
+      
+      return () => {
+        clearInterval(interval);
+        // When finished, set to 100%
+        setTimeout(() => setProgress(100), 300);
+        // Then reset after a delay
+        setTimeout(() => setProgress(0), 1000);
+      };
     }
-  }, [exportProgress, isExporting]);
+  }, [isExporting]);
 
   return (
     <div className="space-y-3">
@@ -66,7 +66,7 @@ export const AudioExporter = ({
           </div>
           <div>
             <Badge variant="outline" className="text-xs">
-              Format original
+              MP3 192kbps
             </Badge>
           </div>
         </div>
@@ -75,41 +75,36 @@ export const AudioExporter = ({
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
-            <div>
+            <div className="space-y-2">
               <Button
-                onClick={onExport}
                 disabled={!canExport || isExporting}
-                className="w-full"
+                onClick={onExport}
+                className="w-full transition-all duration-300 hover:shadow-md hover:translate-y-[-1px]"
               >
                 {isExporting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    {exportMessage}
-                  </>
+                  <Scissors className="h-4 w-4 mr-2 animate-pulse" />
                 ) : (
-                  <>
-                    <FileDown className="h-4 w-4 mr-2" />
-                    Exporter la sélection
-                  </>
+                  <FileDown className="h-4 w-4 mr-2" />
+                )}
+                {isExporting ? "Traitement en cours..." : "Exporter l'audio"}
+                {isExporting && (
+                  <Badge variant="outline" className="ml-2 animate-pulse">
+                    Patientez...
+                  </Badge>
                 )}
               </Button>
               
-              {isExporting && exportProgress > 0 && (
-                <Progress 
-                  value={exportProgress} 
-                  className="h-2 mt-2" 
-                />
-              )}
-              
-              {exportError && (
-                <div className="text-xs text-destructive mt-1">
-                  {exportError}
-                </div>
+              {isExporting && (
+                <Progress value={progress} className="h-2 w-full" />
               )}
             </div>
           </TooltipTrigger>
           <TooltipContent side="top">
-            <p>Exporter la sélection au format original</p>
+            <p>
+              {!canExport
+                ? "Définissez les marqueurs de début et de fin"
+                : "Découper et exporter la section audio sélectionnée (MP3 192kbps)"}
+            </p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
