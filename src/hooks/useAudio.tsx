@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useAudioContext } from './useAudioContext';
@@ -288,6 +287,8 @@ export const useAudio = () => {
       const filename = currentAudioFile 
         ? `${currentAudioFile.name.split('.')[0]}_trimmed.mp3`
         : 'trimmed_audio.mp3';
+      
+      toast.info("Starting MP3 encoding...", { duration: 3000 });
       
       // Export the audio using our FFmpeg utility
       await ffmpegExporter.trimAudioToMP3(

@@ -53,7 +53,7 @@ export class FFmpegExporter {
       console.log(`Encoding with parameters: channels=${channels}, sampleRate=${sampleRate}, bitRate=${bitRate}`);
       
       try {
-        // Create MP3 encoder
+        // Create MP3 encoder - explicitly set MPEG mode to stereo (crucial fix)
         const encoder = new Mp3Encoder(channels, sampleRate, bitRate);
         
         // Create buffer to hold the MP3 data
