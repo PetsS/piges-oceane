@@ -1,4 +1,3 @@
-
 import { useState, useCallback, memo, useEffect, useRef } from "react";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
@@ -116,7 +115,6 @@ export const AudioPlayer = memo(({
 
   const handleAddMarker = useCallback((type: 'start' | 'end') => {
     if (onAddMarker) {
-      // We directly pass the type now; current time is handled in the hook
       onAddMarker(type, currentTime);
     }
   }, [onAddMarker, currentTime]);
