@@ -1,3 +1,4 @@
+
 import { useState, useCallback, memo, useEffect, useRef } from "react";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
@@ -13,12 +14,12 @@ import {
   ChevronsRight,
   Loader2,
   ArrowLeftToLine,
-  ArrowRightToLine,
-  FileDown
+  ArrowRightToLine
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { AudioMarker } from "@/hooks/useAudioTypes";
 import { toast } from "sonner";
+import { MarkerControls } from "./MarkerControls";
 
 interface AudioPlayerProps {
   isPlaying: boolean;
@@ -116,9 +117,8 @@ export const AudioPlayer = memo(({
   const handleAddMarker = useCallback((type: 'start' | 'end') => {
     if (onAddMarker) {
       onAddMarker(type, currentTime);
-      toast.success(`Marqueur ${type === 'start' ? 'début' : 'fin'} défini à ${formatTime(currentTime)}`);
     }
-  }, [onAddMarker, currentTime, formatTime]);
+  }, [onAddMarker, currentTime]);
 
   const toggleMarkerControls = useCallback(() => {
     setShowMarkerControls(prev => !prev);
@@ -239,122 +239,15 @@ export const AudioPlayer = memo(({
       
       {showMarkerControls && (
         <div className="mt-6 space-y-4 border-t pt-4">
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-medium">Marqueurs</h3>
-            <Badge variant="secondary" className="font-mono text-xs">
-              {formatTimeDetailed(currentTime)}
-            </Badge>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <Button
-              variant="outline"
-              className={`flex items-center justify-center space-x-2 group ${
-                startMarker
-                  ? "bg-green-50 border-green-200 hover:bg-green-100"
-                  : ""
-              }`}
-              onClick={() => handleAddMarker("start")}
-            >
-              <ArrowLeftToLine
-                className={`h-4 w-4 mr-2 ${
-                  startMarker ? "text-green-500" : "text-foreground"
-                } group-hover:scale-110 transition-transform`}
-              />
-              <span>Marqueur début</span>
-            </Button>
-
-            <Button
-              variant="outline"
-              className={`flex items-center justify-center space-x-2 group ${
-                endMarker
-                  ? "bg-red-50 border-red-200 hover:bg-red-100"
-                  : ""
-              }`}
-              onClick={() => handleAddMarker("end")}
-            >
-              <ArrowRightToLine
-                className={`h-4 w-4 mr-2 ${
-                  endMarker ? "text-red-500" : "text-foreground"
-                } group-hover:scale-110 transition-transform`}
-              />
-              <span>Marqueur fin</span>
-            </Button>
-          </div>
-
-          <div className="space-y-3">
-            {startMarker && (
-              <div className="flex justify-between items-center p-3 rounded-md bg-green-50 border border-green-100 animate-scale-in">
-                <div>
-                  <div className="text-sm font-medium flex items-center">
-                    <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
-                    Marqueur début
-                  </div>
-                  <div className="text-xs text-muted-foreground font-mono">
-                    {formatTimeDetailed(startMarker.position)}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {endMarker && (
-              <div className="flex justify-between items-center p-3 rounded-md bg-red-50 border border-red-100 animate-scale-in">
-                <div>
-                  <div className="text-sm font-medium flex items-center">
-                    <div className="w-2 h-2 rounded-full bg-red-500 mr-2"></div>
-                    Marqueur fin
-                  </div>
-                  <div className="text-xs text-muted-foreground font-mono">
-                    {formatTimeDetailed(endMarker.position)}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {startMarker && endMarker && (
-              <div className="flex justify-between items-center p-3 rounded-md bg-blue-50 border border-blue-100 animate-scale-in">
-                <div>
-                  <div className="text-sm font-medium">Durée</div>
-                  <div className="text-xs text-muted-foreground font-mono">
-                    {formatTimeDetailed(
-                      endMarker.position - startMarker.position
-                    )}
-                  </div>
-                </div>
-                <div>
-                  <Badge variant="outline" className="text-xs">
-                    MP3
-                  </Badge>
-                </div>
-              </div>
-            )}
-
-            <Button
-              onClick={onExport}
-              disabled={!canExport || isExporting}
-              className="w-full"
-            >
-              {isExporting ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Export en cours...
-                </>
-              ) : (
-                <>
-                  <FileDown className="h-4 w-4 mr-2" />
-                  Exporter la sélection
-                </>
-              )}
-            </Button>
-            
-            {isExporting && exportProgress > 0 && (
-              <Progress 
-                value={exportProgress} 
-                className="h-2 mt-2" 
-                indicatorClassName="bg-primary"
-              />
-            )}
-          </div>
+          <MarkerControls 
+            markers={markers}
+            onAddMarker={handleAddMarker}
+            onExport={onExport}
+            currentTime={currentTime}
+            formatTimeDetailed={formatTimeDetailed}
+            isExporting={isExporting}
+            exportProgress={exportProgress}
+          />
         </div>
       )}
     </div>

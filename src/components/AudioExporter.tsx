@@ -2,7 +2,7 @@
 import { Button } from "@/components/ui/button";
 import { FileDown, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { AudioMarker } from "@/hooks/useAudio";
+import { AudioMarker } from "@/hooks/useAudioTypes";
 import {
   Tooltip,
   TooltipContent,
@@ -47,7 +47,7 @@ export const AudioExporter = ({
           </div>
           <div>
             <Badge variant="outline" className="text-xs">
-              MP3
+              Format original
             </Badge>
           </div>
         </div>
@@ -91,7 +91,7 @@ export const AudioExporter = ({
             </div>
           </TooltipTrigger>
           <TooltipContent side="top">
-            <p>Exporter la sélection en fichier MP3</p>
+            <p>Exporter la sélection au format original</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
