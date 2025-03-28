@@ -18,6 +18,9 @@ export const useAudioMarkers = (formatTime: (time: number) => string) => {
     setMarkers([...filteredMarkers, newMarker]);
     
     toast.success(`Marqueur ${type === 'start' ? 'début' : 'fin'} défini à ${formatTime(currentTime)}`);
+    
+    // Don't modify the current time when setting a marker
+    return currentTime;
   }, [markers, formatTime]);
 
   const removeMarker = useCallback((id: string) => {

@@ -7,7 +7,7 @@ import { useAudioPlayback } from './useAudioPlayback';
 import { useAudioFiles } from './useAudioFiles';
 import { useAudioMarkers } from './useAudioMarkers';
 import { AudioMarker, AudioFile } from './useAudioTypes';
-import lamejs from 'lamejs';
+import * as lamejs from 'lamejs';
 
 export type { AudioMarker, AudioFile };
 
@@ -56,7 +56,7 @@ export const useAudio = () => {
     audioSrc
   );
   
-  // Add marker at current time
+  // Add marker at current time without moving playback position
   const addMarker = (type: 'start' | 'end') => {
     // If we don't have any markers yet and the user adds a marker,
     // let's automatically add the other one at the appropriate position
@@ -84,6 +84,8 @@ export const useAudio = () => {
     setMarkers([...filteredMarkers, newMarker]);
     
     toast.success(`Marqueur ${type === 'start' ? 'début' : 'fin'} défini à ${formatTime(currentTime)}`);
+    
+    // Don't modify current playback position
   };
   
   // Remove marker by ID
@@ -382,10 +384,15 @@ export const useAudio = () => {
       setExportProgress(70);
       
       // Convert to MP3 using lamejs
+      const channels = renderedBuffer.numberOfChannels;
+      const sampleRate = renderedBuffer.sampleRate;
+      const bitRate = 192;
+      
+      // Create encoder with explicit MPEGMode argument
       const mp3Encoder = new lamejs.Mp3Encoder(
-        renderedBuffer.numberOfChannels,
-        renderedBuffer.sampleRate,
-        192 // bitrate
+        channels,
+        sampleRate,
+        bitRate
       );
       
       const mp3Data = [];
