@@ -4,9 +4,9 @@ import { toast } from 'sonner';
 import { useAudioContext } from './useAudioContext';
 import { useAudioFormatting } from './useAudioFormatting';
 import { useAudioPlayback } from './useAudioPlayback';
-import { useAudioExport } from './useAudioExport';
 import { useAudioFiles } from './useAudioFiles';
 import { AudioMarker, AudioFile } from './useAudioTypes';
+import { ffmpegExporter } from '@/utils/ffmpegExporter';
 
 export type { AudioMarker, AudioFile };
 
@@ -22,6 +22,8 @@ export const useAudio = () => {
   const [isBuffering, setIsBuffering] = useState(false);
   const [showMarkerControls, setShowMarkerControls] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
+  const [exportError, setExportError] = useState<string | null>(null);
   
   // Create refs
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -66,16 +68,6 @@ export const useAudio = () => {
     getAudioContext,
     audioRef,
     audioSrc
-  );
-  
-  // Initialize export functionality
-  const { exportTrimmedAudio, exportProgress } = useAudioExport(
-    audioBuffer, 
-    markers, 
-    duration, 
-    formatTime, 
-    audioRef, 
-    currentAudioFile
   );
   
   // Add marker at current time
@@ -257,18 +249,89 @@ export const useAudio = () => {
     };
   }, []);
 
-  // Handle export with progress tracking
-  const handleExportWithProgress = async () => {
+  // Export audio with FFmpeg
+  const exportTrimmedAudio = async () => {
+    // Reset the error state when starting a new export
+    setExportError(null);
+    
+    // Check if markers are set
+    const startMarker = markers.find(marker => marker.type === 'start');
+    const endMarker = markers.find(marker => marker.type === 'end');
+    
+    if (!startMarker || !endMarker) {
+      toast.error("Please set both start and end markers");
+      setExportError("Missing markers");
+      return;
+    }
+    
+    if (startMarker.position >= endMarker.position) {
+      toast.error("Start marker must be before end marker");
+      setExportError("Invalid marker positions");
+      return;
+    }
+    
+    if (!audioSrc) {
+      toast.error("No audio source available");
+      setExportError("No audio source");
+      return;
+    }
+    
+    // Start export process
     setIsExporting(true);
+    setExportProgress(0);
+    
     try {
-      await exportTrimmedAudio();
+      // Calculate duration
+      const duration = endMarker.position - startMarker.position;
+      
+      // Generate output filename
+      const filename = currentAudioFile 
+        ? `${currentAudioFile.name.split('.')[0]}_trimmed.mp3`
+        : 'trimmed_audio.mp3';
+      
+      // Export the audio using our FFmpeg utility
+      await ffmpegExporter.trimAudioToMP3(
+        audioSrc,
+        startMarker.position,
+        duration,
+        filename,
+        {
+          onProgress: (progress) => {
+            setExportProgress(progress);
+          },
+          onComplete: (url, filename) => {
+            setIsExporting(false);
+            setExportProgress(100);
+            
+            // Create a download link
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            
+            // Clean up
+            setTimeout(() => {
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+            }, 100);
+            
+            toast.success("Audio exported successfully!");
+          },
+          onError: (error) => {
+            console.error('Export error:', error);
+            setExportError(error);
+            setIsExporting(false);
+            toast.error(`Export failed: ${error}`);
+          }
+        }
+      );
     } catch (error) {
       console.error('Export error:', error);
-    } finally {
-      // Give some time for the UI to update before resetting
-      setTimeout(() => {
-        setIsExporting(false);
-      }, 1000);
+      setExportError(error.message || "Unknown error");
+      setIsExporting(false);
+      toast.error("Failed to export audio");
     }
   };
   
@@ -286,13 +349,14 @@ export const useAudio = () => {
     showMarkerControls,
     isExporting,
     exportProgress,
+    exportError,
     setShowMarkerControls,
     togglePlay,
     seek,
     changeVolume,
     addMarker,
     removeMarker,
-    exportTrimmedAudio: handleExportWithProgress,
+    exportTrimmedAudio,
     loadAudioFile,
     loadFilesFromUNC,
     formatTime,

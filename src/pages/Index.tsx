@@ -36,7 +36,8 @@ const Index = () => {
     showMarkerControls,
     setShowMarkerControls,
     isExporting,
-    exportProgress
+    exportProgress,
+    exportError
   } = useAudio();
 
   const handleFileSelect = (file) => {
@@ -134,6 +135,7 @@ const Index = () => {
                 formatTimeDetailed={formatTimeDetailed}
                 isExporting={isExporting}
                 exportProgress={exportProgress}
+                exportError={exportError}
               />
             )}
           </div>
