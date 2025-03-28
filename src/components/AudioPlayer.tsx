@@ -2,6 +2,7 @@
 import { useState, useCallback, memo, useEffect, useRef } from "react";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { 
   Play, 
   Pause, 
@@ -11,8 +12,14 @@ import {
   Music,
   ChevronsLeft,
   ChevronsRight,
-  Loader2
+  Loader2,
+  ArrowLeftToLine,
+  ArrowRightToLine,
+  FileDown
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { AudioMarker } from "@/hooks/useAudioTypes";
+import { toast } from "sonner";
 
 interface AudioPlayerProps {
   isPlaying: boolean;
@@ -23,9 +30,15 @@ interface AudioPlayerProps {
   onVolumeChange: (value: number) => void;
   onSeek: (time: number) => void;
   formatTime: (time: number) => string;
+  formatTimeDetailed?: (time: number) => string;
   audioTitle?: string;
   isLoading?: boolean;
   isBuffering?: boolean;
+  markers?: AudioMarker[];
+  onAddMarker?: (type: 'start' | 'end', time: number) => void;
+  onExport?: () => void;
+  isExporting?: boolean;
+  exportProgress?: number;
 }
 
 // Use memo to prevent unnecessary re-renders
@@ -38,15 +51,27 @@ export const AudioPlayer = memo(({
   onVolumeChange,
   onSeek,
   formatTime,
+  formatTimeDetailed = formatTime,
   audioTitle = "Aucun audio chargé",
   isLoading = false,
   isBuffering = false,
+  markers = [],
+  onAddMarker,
+  onExport,
+  isExporting = false,
+  exportProgress = 0,
 }: AudioPlayerProps) => {
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
   const [playbackEnabled, setPlaybackEnabled] = useState(false);
+  const [showMarkerControls, setShowMarkerControls] = useState(false);
   const playButtonRef = useRef<HTMLButtonElement>(null);
   
   const playbackPercentage = duration > 0 ? (currentTime / duration) * 100 : 0;
+  
+  const startMarker = markers.find(marker => marker.type === 'start');
+  const endMarker = markers.find(marker => marker.type === 'end');
+  
+  const canExport = startMarker && endMarker && startMarker.position < endMarker.position;
   
   // Enable playback controls once audio is loaded
   useEffect(() => {
@@ -95,6 +120,19 @@ export const AudioPlayer = memo(({
     }
   }, [onPlayPause]);
 
+  // Handle adding marker without disturbing playback
+  const handleAddMarker = useCallback((type: 'start' | 'end') => {
+    if (onAddMarker) {
+      onAddMarker(type, currentTime);
+      toast.success(`Marqueur ${type === 'start' ? 'début' : 'fin'} défini à ${formatTime(currentTime)}`);
+    }
+  }, [onAddMarker, currentTime, formatTime]);
+
+  // Toggle marker controls visibility
+  const toggleMarkerControls = useCallback(() => {
+    setShowMarkerControls(prev => !prev);
+  }, []);
+
   return (
     <div className="glass-panel rounded-lg p-4 animate-fade-in">
       <div className="flex items-center justify-between mb-4">
@@ -136,6 +174,17 @@ export const AudioPlayer = memo(({
               </div>
             )}
           </div>
+          
+          {duration > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={toggleMarkerControls}
+              className={showMarkerControls ? "bg-primary/10" : ""}
+            >
+              {showMarkerControls ? "Masquer marqueurs" : "Afficher marqueurs"}
+            </Button>
+          )}
         </div>
       </div>
       
@@ -196,6 +245,127 @@ export const AudioPlayer = memo(({
           </Button>
         </div>
       </div>
+      
+      {showMarkerControls && (
+        <div className="mt-6 space-y-4 border-t pt-4">
+          <div className="flex justify-between items-center">
+            <h3 className="text-lg font-medium">Marqueurs</h3>
+            <Badge variant="secondary" className="font-mono text-xs">
+              {formatTimeDetailed(currentTime)}
+            </Badge>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Button
+              variant="outline"
+              className={`flex items-center justify-center space-x-2 group ${
+                startMarker
+                  ? "bg-green-50 border-green-200 hover:bg-green-100"
+                  : ""
+              }`}
+              onClick={() => handleAddMarker("start")}
+            >
+              <ArrowLeftToLine
+                className={`h-4 w-4 mr-2 ${
+                  startMarker ? "text-green-500" : "text-foreground"
+                } group-hover:scale-110 transition-transform`}
+              />
+              <span>Marqueur début</span>
+            </Button>
+
+            <Button
+              variant="outline"
+              className={`flex items-center justify-center space-x-2 group ${
+                endMarker
+                  ? "bg-red-50 border-red-200 hover:bg-red-100"
+                  : ""
+              }`}
+              onClick={() => handleAddMarker("end")}
+            >
+              <ArrowRightToLine
+                className={`h-4 w-4 mr-2 ${
+                  endMarker ? "text-red-500" : "text-foreground"
+                } group-hover:scale-110 transition-transform`}
+              />
+              <span>Marqueur fin</span>
+            </Button>
+          </div>
+
+          <div className="space-y-3">
+            {startMarker && (
+              <div className="flex justify-between items-center p-3 rounded-md bg-green-50 border border-green-100 animate-scale-in">
+                <div>
+                  <div className="text-sm font-medium flex items-center">
+                    <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
+                    Marqueur début
+                  </div>
+                  <div className="text-xs text-muted-foreground font-mono">
+                    {formatTimeDetailed(startMarker.position)}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {endMarker && (
+              <div className="flex justify-between items-center p-3 rounded-md bg-red-50 border border-red-100 animate-scale-in">
+                <div>
+                  <div className="text-sm font-medium flex items-center">
+                    <div className="w-2 h-2 rounded-full bg-red-500 mr-2"></div>
+                    Marqueur fin
+                  </div>
+                  <div className="text-xs text-muted-foreground font-mono">
+                    {formatTimeDetailed(endMarker.position)}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {startMarker && endMarker && (
+              <div className="flex justify-between items-center p-3 rounded-md bg-blue-50 border border-blue-100 animate-scale-in">
+                <div>
+                  <div className="text-sm font-medium">Durée</div>
+                  <div className="text-xs text-muted-foreground font-mono">
+                    {formatTimeDetailed(
+                      endMarker.position - startMarker.position
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <Badge variant="outline" className="text-xs">
+                    MP3
+                  </Badge>
+                </div>
+              </div>
+            )}
+
+            <Button
+              onClick={onExport}
+              disabled={!canExport || isExporting}
+              className="w-full"
+            >
+              {isExporting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Export en cours...
+                </>
+              ) : (
+                <>
+                  <FileDown className="h-4 w-4 mr-2" />
+                  Exporter la sélection
+                </>
+              )}
+            </Button>
+            
+            {isExporting && exportProgress > 0 && (
+              <Progress 
+                value={exportProgress} 
+                className="h-2 mt-2" 
+                indicatorClassName="bg-primary"
+              />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 });
