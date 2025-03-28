@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useAudioContext } from './useAudioContext';
@@ -281,7 +280,7 @@ export const useAudio = () => {
     };
   }, []);
 
-  // Export trimmed audio using lamejs
+  // Export trimmed audio using the original file format
   const exportTrimmedAudio = async () => {
     const startMarker = markers.find(marker => marker.type === 'start');
     const endMarker = markers.find(marker => marker.type === 'end');
@@ -365,88 +364,79 @@ export const useAudio = () => {
       
       setExportProgress(70);
       
-      // Fixed approach for MP3 encoding
-      const channels = renderedBuffer.numberOfChannels;
-      const sampleRate = renderedBuffer.sampleRate;
+      // Determine file type from original source
+      const originalFileType = currentAudioFile ? 
+        (currentAudioFile.name.toLowerCase().endsWith('.wav') ? 'audio/wav' : 'audio/mp3') : 
+        'audio/mp3';
       
-      // Create the MP3 encoder with explicit simple parameters
-      // Avoid MPEGMode enumeration which caused issues
-      const mp3encoder = new lamejs.Mp3Encoder(channels, sampleRate, 192);
+      // Create a media stream source
+      const audioCtx = new AudioContext();
+      const mediaStreamDest = audioCtx.createMediaStreamDestination();
+      const sourceNode = audioCtx.createBufferSource();
+      sourceNode.buffer = renderedBuffer;
+      sourceNode.connect(mediaStreamDest);
       
-      const mp3Data = [];
-      const sampleBlockSize = 1152; // Standard MP3 frame size
+      // Create a media recorder to capture the stream with the appropriate format
+      const mediaRecorder = new MediaRecorder(mediaStreamDest.stream, {
+        mimeType: MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg'
+      });
       
-      const left = renderedBuffer.getChannelData(0);
-      const right = channels > 1 ? renderedBuffer.getChannelData(1) : renderedBuffer.getChannelData(0);
+      const chunks: Blob[] = [];
       
-      const totalSamples = renderedBuffer.length;
-      console.log(`Total samples to process: ${totalSamples}`);
-      
-      // Process the audio data in chunks
-      for (let i = 0; i < totalSamples; i += sampleBlockSize) {
-        if (i % (sampleBlockSize * 20) === 0) {
-          const progress = 70 + Math.min(25, (i / totalSamples) * 25);
-          setExportProgress(progress);
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          chunks.push(e.data);
         }
+      };
+      
+      mediaRecorder.onstop = () => {
+        setExportProgress(90);
         
-        const leftChunk = new Int16Array(sampleBlockSize);
-        const rightChunk = new Int16Array(sampleBlockSize);
+        // Create the blob from all chunks
+        const blob = new Blob(chunks, { type: originalFileType });
+        const url = URL.createObjectURL(blob);
         
-        for (let j = 0; j < sampleBlockSize; j++) {
-          if (i + j < totalSamples) {
-            // Convert float samples (-1.0 to 1.0) to int16 (-32768 to 32767)
-            leftChunk[j] = Math.max(-32768, Math.min(32767, Math.round(left[i + j] * 32767)));
-            rightChunk[j] = Math.max(-32768, Math.min(32767, Math.round(right[i + j] * 32767)));
-          } else {
-            // Fill remaining samples with silence
-            leftChunk[j] = 0;
-            rightChunk[j] = 0;
-          }
-        }
+        // Get appropriate file extension
+        const fileExt = originalFileType === 'audio/wav' ? '.wav' : '.mp3';
         
-        // Encode the chunk to MP3
-        const mp3buf = mp3encoder.encodeBuffer(leftChunk, rightChunk);
-        if (mp3buf.length > 0) {
-          mp3Data.push(mp3buf);
-        }
-      }
-      
-      // Finish encoding
-      const mp3buf = mp3encoder.flush();
-      if (mp3buf.length > 0) {
-        mp3Data.push(mp3buf);
-      }
-      
-      setExportProgress(95);
-      
-      // Convert to a single Blob
-      const blob = new Blob(mp3Data, { type: 'audio/mp3' });
-      const url = URL.createObjectURL(blob);
-      
-      // Trigger download
-      const fileName = currentAudioFile 
-        ? `${currentAudioFile.name.replace(/\.[^/.]+$/, '')}_trim.mp3`
-        : `audio_trim_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.mp3`;
-      
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      a.style.display = 'none';
-      document.body.appendChild(a);
-      a.click();
-      
-      // Clean up
-      setTimeout(() => {
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        setExportProgress(100);
-        toast.success("Export réussi");
+        // Trigger download
+        const fileName = currentAudioFile 
+          ? `${currentAudioFile.name.replace(/\.[^/.]+$/, '')}_trim${fileExt}`
+          : `audio_trim_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}${fileExt}`;
         
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        
+        // Clean up
         setTimeout(() => {
-          setIsExporting(false);
-          setExportProgress(0);
-        }, 1000);
-      }, 100);
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          setExportProgress(100);
+          toast.success("Export réussi");
+          
+          setTimeout(() => {
+            setIsExporting(false);
+            setExportProgress(0);
+          }, 1000);
+        }, 100);
+      };
+      
+      // Start recording and then stop immediately after source has played
+      mediaRecorder.start();
+      sourceNode.start(0);
+      
+      // Stop after duration
+      setTimeout(() => {
+        sourceNode.stop();
+        mediaRecorder.stop();
+        audioCtx.close();
+      }, duration * 1000 + 100);
+      
+      setExportProgress(80);
       
     } catch (error) {
       console.error("Error exporting audio:", error);
