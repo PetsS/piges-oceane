@@ -18,6 +18,7 @@ export const useAudioExport = (
   const { getAudioContext } = useAudioContext();
   const [ffmpegLoaded, setFfmpegLoaded] = useState<boolean>(false);
   const ffmpegRef = useRef<FFmpeg | null>(null);
+  const [exportProgress, setExportProgress] = useState<number>(0);
 
   // Helper function to convert AudioBuffer to WAV for processing
   const audioBufferToWav = (buffer: AudioBuffer): ArrayBuffer => {
@@ -80,11 +81,25 @@ export const useAudioExport = (
 
   // Initialize FFmpeg
   const loadFFmpeg = async () => {
-    if (ffmpegRef.current || ffmpegLoaded) return;
+    if (ffmpegRef.current && ffmpegLoaded) {
+      console.log("FFmpeg already loaded, reusing instance");
+      return ffmpegRef.current;
+    }
     
     try {
+      console.log("Loading FFmpeg...");
       const ffmpeg = new FFmpeg();
-      ffmpegRef.current = ffmpeg;
+      
+      // Set up logger to monitor FFmpeg progress
+      ffmpeg.on('log', ({ message }) => {
+        console.log('FFmpeg log:', message);
+      });
+      
+      // Set up progress handler
+      ffmpeg.on('progress', ({ progress }) => {
+        setExportProgress(Math.floor(progress * 100));
+        console.log(`FFmpeg processing: ${Math.floor(progress * 100)}%`);
+      });
       
       // Load FFmpeg with CDN build (for browser support)
       await ffmpeg.load({
@@ -92,11 +107,14 @@ export const useAudioExport = (
         wasmURL: 'https://unpkg.com/@ffmpeg/core@0.12.4/dist/ffmpeg-core.wasm',
       });
       
+      ffmpegRef.current = ffmpeg;
       setFfmpegLoaded(true);
       console.log('FFmpeg loaded successfully');
+      return ffmpeg;
     } catch (error) {
       console.error('Error loading FFmpeg:', error);
       toast.error('Error initializing audio converter');
+      throw error;
     }
   };
 
@@ -107,13 +125,19 @@ export const useAudioExport = (
     }
     
     processingRef.current = true;
+    setExportProgress(0);
     
     try {
       toast.info('Préparation de l\'audio pour l\'export...');
       
       // Load FFmpeg if not already loaded
-      if (!ffmpegRef.current || !ffmpegLoaded) {
-        await loadFFmpeg();
+      let ffmpeg;
+      try {
+        ffmpeg = await loadFFmpeg();
+        if (!ffmpeg) throw new Error("Failed to initialize FFmpeg");
+      } catch (ffmpegError) {
+        console.error("FFmpeg initialization error:", ffmpegError);
+        throw new Error("Failed to initialize audio converter");
       }
       
       let bufferToExport = audioBuffer;
@@ -263,30 +287,7 @@ export const useAudioExport = (
       const wavData = audioBufferToWav(trimmedBuffer);
       const wavBlob = new Blob([wavData], { type: 'audio/wav' });
       
-      // Use FFmpeg to convert WAV to MP3
-      const ffmpeg = ffmpegRef.current;
-      if (!ffmpeg) {
-        throw new Error("FFmpeg not initialized");
-      }
-      
-      // Create input filename for FFmpeg
-      const inputFileName = 'input.wav';
-      const outputFileName = 'output.mp3';
-      
-      // Write the WAV file to FFmpeg's virtual file system
-      await ffmpeg.writeFile(inputFileName, await fetchFile(wavBlob));
-      
-      // Run FFmpeg command to convert WAV to MP3 with high quality
-      await ffmpeg.exec([
-        '-i', inputFileName,
-        '-c:a', 'libmp3lame',
-        '-q:a', '2', // High quality (0-best, 9-worst)
-        outputFileName
-      ]);
-      
-      // Read the output file from FFmpeg's virtual file system
-      const outputData = await ffmpeg.readFile(outputFileName);
-      const mp3Blob = new Blob([outputData], { type: 'audio/mp3' });
+      console.log("WAV blob created, size:", wavBlob.size);
       
       // Generate filename for the exported audio
       const fileName = currentAudioFile ? 
@@ -294,45 +295,91 @@ export const useAudioExport = (
                       "audio";
       const exportFileName = `${fileName}_${formatTime(startTime).replace(':', '')}-${formatTime(endTime).replace(':', '')}.mp3`;
       
-      const downloadUrl = URL.createObjectURL(mp3Blob);
+      // Create input and output filenames for FFmpeg
+      const inputFileName = 'input.wav';
+      const outputFileName = 'output.mp3';
       
-      // Show toast with download action
-      toast.success(`Export prêt: ${exportFileName}`, {
-        description: `Découpé de ${formatTime(startTime)} à ${formatTime(endTime)} (MP3 format)`,
-        action: {
-          label: 'Télécharger',
-          onClick: () => {
-            const a = document.createElement('a');
-            a.href = downloadUrl;
-            a.download = exportFileName;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            setTimeout(() => URL.revokeObjectURL(downloadUrl), 100);
-          }
-        },
-        duration: 10000 // Longer duration to give user time to click
-      });
+      try {
+        // Write the WAV file to FFmpeg's virtual file system
+        console.log("Writing input WAV to FFmpeg virtual filesystem");
+        await ffmpeg.writeFile(inputFileName, await fetchFile(wavBlob));
+        console.log("Input WAV written successfully");
+        
+        // Run FFmpeg command to convert WAV to MP3 with high quality
+        console.log("Starting FFmpeg conversion process");
+        const ffmpegCommand = [
+          '-i', inputFileName,
+          '-c:a', 'libmp3lame', 
+          '-q:a', '2', // High quality (0-best, 9-worst)
+          outputFileName
+        ];
+        
+        console.log("Running FFmpeg command:", ffmpegCommand.join(' '));
+        await ffmpeg.exec(ffmpegCommand);
+        console.log("FFmpeg conversion completed successfully");
+        
+        // Read the output file from FFmpeg's virtual file system
+        console.log("Reading output MP3 from FFmpeg virtual filesystem");
+        const outputData = await ffmpeg.readFile(outputFileName);
+        console.log("Output MP3 read successfully, size:", outputData.byteLength);
+        
+        if (!outputData || outputData.byteLength === 0) {
+          throw new Error("FFmpeg produced empty output file");
+        }
+        
+        const mp3Blob = new Blob([outputData], { type: 'audio/mp3' });
+        console.log("MP3 blob created, size:", mp3Blob.size);
+        
+        if (mp3Blob.size === 0) {
+          throw new Error("Generated MP3 file is empty");
+        }
+        
+        const downloadUrl = URL.createObjectURL(mp3Blob);
+        console.log("Created download URL for MP3:", downloadUrl);
+        
+        // Show toast with download action
+        toast.success(`Export prêt: ${exportFileName}`, {
+          description: `Découpé de ${formatTime(startTime)} à ${formatTime(endTime)} (MP3 format)`,
+          action: {
+            label: 'Télécharger',
+            onClick: () => {
+              const a = document.createElement('a');
+              a.href = downloadUrl;
+              a.download = exportFileName;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              setTimeout(() => URL.revokeObjectURL(downloadUrl), 100);
+            }
+          },
+          duration: 10000 // Longer duration to give user time to click
+        });
 
-      // Also trigger automatic download
-      const downloadLink = document.createElement('a');
-      downloadLink.href = downloadUrl;
-      downloadLink.download = exportFileName;
-      document.body.appendChild(downloadLink);
-      downloadLink.click();
-      document.body.removeChild(downloadLink);
-      setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
-      
-      console.log(`Export completed successfully: ${exportFileName}`);
+        // Trigger automatic download
+        const downloadLink = document.createElement('a');
+        downloadLink.href = downloadUrl;
+        downloadLink.download = exportFileName;
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+        setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+        
+        console.log(`Export completed successfully: ${exportFileName}`);
+        setExportProgress(100);
+      } catch (ffmpegError) {
+        console.error("FFmpeg processing error:", ffmpegError);
+        throw new Error("Failed to convert audio to MP3");
+      }
     } catch (error) {
       console.error('Error exporting audio:', error);
-      toast.error('Erreur lors de l\'export du fichier audio');
+      toast.error(`Erreur lors de l'export: ${error.message || 'Une erreur est survenue'}`);
     } finally {
       processingRef.current = false;
     }
-  }, [audioBuffer, markers, duration, formatTime, getAudioContext, currentAudioFile, audioRef, ffmpegLoaded, loadFFmpeg]);
+  }, [audioBuffer, markers, duration, formatTime, getAudioContext, currentAudioFile, audioRef, loadFFmpeg]);
 
   return {
-    exportTrimmedAudio
+    exportTrimmedAudio,
+    exportProgress
   };
 };

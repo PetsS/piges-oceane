@@ -21,6 +21,7 @@ export const useAudio = () => {
   const [markers, setMarkers] = useState<AudioMarker[]>([]);
   const [isBuffering, setIsBuffering] = useState(false);
   const [showMarkerControls, setShowMarkerControls] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   
   // Create refs
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -68,7 +69,7 @@ export const useAudio = () => {
   );
   
   // Initialize export functionality
-  const { exportTrimmedAudio } = useAudioExport(
+  const { exportTrimmedAudio, exportProgress } = useAudioExport(
     audioBuffer, 
     markers, 
     duration, 
@@ -255,6 +256,21 @@ export const useAudio = () => {
       audio.removeEventListener('error', errorHandler);
     };
   }, []);
+
+  // Handle export with progress tracking
+  const handleExportWithProgress = async () => {
+    setIsExporting(true);
+    try {
+      await exportTrimmedAudio();
+    } catch (error) {
+      console.error('Export error:', error);
+    } finally {
+      // Give some time for the UI to update before resetting
+      setTimeout(() => {
+        setIsExporting(false);
+      }, 1000);
+    }
+  };
   
   return {
     audioSrc,
@@ -268,13 +284,15 @@ export const useAudio = () => {
     currentAudioFile,
     isBuffering,
     showMarkerControls,
+    isExporting,
+    exportProgress,
     setShowMarkerControls,
     togglePlay,
     seek,
     changeVolume,
     addMarker,
     removeMarker,
-    exportTrimmedAudio,
+    exportTrimmedAudio: handleExportWithProgress,
     loadAudioFile,
     loadFilesFromUNC,
     formatTime,
