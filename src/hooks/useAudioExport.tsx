@@ -1,3 +1,4 @@
+
 import { useRef, useCallback } from 'react';
 import { toast } from 'sonner';
 import { AudioMarker } from './useAudioTypes';
@@ -23,10 +24,10 @@ export const useAudioExport = (
       const numChannels = Math.min(buffer.numberOfChannels, 2); // MP3 supports max 2 channels
       const sampleRate = buffer.sampleRate;
       
-      // Get the audio mode - stereo (j) or mono (m)
-      const mode = numChannels === 1 ? lamejs.MPEGMode.MONO : lamejs.MPEGMode.JOINT_STEREO;
+      // Use correct mode constants - lamejs exports these directly
+      const mode = numChannels === 1 ? 3 : 1; // 3 = MONO, 1 = JOINT_STEREO
       
-      console.log(`Using MP3 mode: ${mode === lamejs.MPEGMode.MONO ? 'mono' : 'joint stereo'}`);
+      console.log(`Using MP3 mode: ${mode === 3 ? 'mono' : 'joint stereo'}`);
       
       // Create MP3 encoder with proper mode setup
       const mp3encoder = new lamejs.Mp3Encoder(
