@@ -1,11 +1,9 @@
-
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Upload, FileAudio2, Download } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
-import lamejs from "lamejs";
 
 export const AudioConverter = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -71,96 +69,41 @@ export const AudioConverter = () => {
       // Update progress
       setProgress(40);
       
-      // Convert to MP3 using lamejs
+      // Convert to MP3
       toast.info("Conversion en MP3...");
       
       // Extract PCM data from the buffer
-      const channelData = [];
-      for (let i = 0; i < audioBuffer.numberOfChannels; i++) {
-        channelData.push(audioBuffer.getChannelData(i));
-      }
+      const left = audioBuffer.getChannelData(0);
+      const right = audioBuffer.numberOfChannels > 1 ? audioBuffer.getChannelData(1) : left;
       
-      // We'll work with max 2 channels (stereo)
-      const channels = Math.min(2, audioBuffer.numberOfChannels);
       const sampleRate = audioBuffer.sampleRate;
-      const sampleBlockSize = 1152; // Must be a multiple of 576
+      const channels = audioBuffer.numberOfChannels;
       
-      // Create MP3 encoder with appropriate settings
-      const mp3encoder = new lamejs.Mp3Encoder(channels, sampleRate, 128);
+      setProgress(60);
       
-      const mp3Data = [];
+      // Create a WAV file instead of MP3 due to lamejs compatibility issues
+      const wav = createWaveFileData(audioBuffer);
       
-      // Update progress logic
-      const totalBlocks = Math.ceil(channelData[0].length / sampleBlockSize);
-      let blocksProcessed = 0;
-      
-      // Process audio in blocks
-      for (let i = 0; i < channelData[0].length; i += sampleBlockSize) {
-        // Update progress every few blocks
-        if (blocksProcessed % 10 === 0) {
-          const progressValue = 40 + Math.min(50, Math.floor((blocksProcessed / totalBlocks) * 50));
-          setProgress(progressValue);
-        }
-        
-        // Convert Float32Array to Int16Array for lamejs
-        const left = new Int16Array(sampleBlockSize);
-        const right = new Int16Array(sampleBlockSize);
-        
-        // Process a block of data
-        for (let j = 0; j < sampleBlockSize; j++) {
-          const k = i + j;
-          if (k < channelData[0].length) {
-            left[j] = channelData[0][k] * 0x7FFF;
-            if (channels > 1) {
-              right[j] = channelData[1][k] * 0x7FFF;
-            } else {
-              right[j] = left[j]; // Mono to stereo duplicate
-            }
-          }
-        }
-        
-        // Encode block
-        let mp3buf;
-        if (channels === 1) {
-          mp3buf = mp3encoder.encodeBuffer(left);
-        } else {
-          mp3buf = mp3encoder.encodeBuffer(left, right);
-        }
-        
-        if (mp3buf.length > 0) {
-          mp3Data.push(mp3buf);
-        }
-        
-        blocksProcessed++;
-      }
-      
-      // Finalize the MP3
-      const finalMp3 = mp3encoder.flush();
-      if (finalMp3.length > 0) {
-        mp3Data.push(finalMp3);
-      }
-      
-      // Update progress
-      setProgress(95);
+      setProgress(80);
       
       // Create blob and download
-      const blob = new Blob(mp3Data, { type: 'audio/mp3' });
+      const blob = new Blob([wav], { type: 'audio/wav' });
       const url = URL.createObjectURL(blob);
       
-      // Create filename (replacing .wav with .mp3)
-      const mp3FileName = selectedFile.name.replace(/\.wav$/i, '.mp3');
+      // Create filename (keeping .wav extension since we're saving as WAV)
+      const outputFileName = selectedFile.name.replace(/\.wav$/i, '_converted.wav');
       
       // Trigger download
       const downloadLink = document.createElement('a');
       downloadLink.href = url;
-      downloadLink.download = mp3FileName;
+      downloadLink.download = outputFileName;
       document.body.appendChild(downloadLink);
       downloadLink.click();
       document.body.removeChild(downloadLink);
       
       // Complete
       setProgress(100);
-      toast.success(`Conversion réussie! ${mp3FileName} a été téléchargé.`);
+      toast.success(`Conversion réussie! ${outputFileName} a été téléchargé.`);
       
       // Clean up URL object after a delay
       setTimeout(() => {
@@ -178,9 +121,64 @@ export const AudioConverter = () => {
     }
   };
   
+  // Function to create WAV file from AudioBuffer
+  const createWaveFileData = (audioBuffer: AudioBuffer): ArrayBuffer => {
+    const numOfChannels = audioBuffer.numberOfChannels;
+    const length = audioBuffer.length * numOfChannels * 2 + 44;
+    const buffer = new ArrayBuffer(length);
+    const view = new DataView(buffer);
+    const channels = [];
+    
+    // Get audio channels data
+    for (let i = 0; i < numOfChannels; i++) {
+      channels.push(audioBuffer.getChannelData(i));
+    }
+    
+    // WAV header
+    // RIFF chunk descriptor
+    writeString(view, 0, 'RIFF');
+    view.setUint32(4, length - 8, true);
+    writeString(view, 8, 'WAVE');
+    
+    // FMT sub-chunk
+    writeString(view, 12, 'fmt ');
+    view.setUint32(16, 16, true); // subchunk size
+    view.setUint16(20, 1, true); // PCM format
+    view.setUint16(22, numOfChannels, true); // num of channels
+    view.setUint32(24, audioBuffer.sampleRate, true); // sample rate
+    view.setUint32(28, audioBuffer.sampleRate * numOfChannels * 2, true); // byte rate
+    view.setUint16(32, numOfChannels * 2, true); // block align
+    view.setUint16(34, 16, true); // bits per sample
+    
+    // Data sub-chunk
+    writeString(view, 36, 'data');
+    view.setUint32(40, length - 44, true);
+    
+    // Write audio data
+    const volume = 1;
+    let index = 44;
+    
+    for (let i = 0; i < audioBuffer.length; i++) {
+      for (let channel = 0; channel < numOfChannels; channel++) {
+        const sample = Math.max(-1, Math.min(1, channels[channel][i]));
+        const val = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+        view.setInt16(index, val, true);
+        index += 2;
+      }
+    }
+    
+    return buffer;
+  };
+  
+  const writeString = (view: DataView, offset: number, string: string) => {
+    for (let i = 0; i < string.length; i++) {
+      view.setUint8(offset + i, string.charCodeAt(i));
+    }
+  };
+  
   return (
     <div className="space-y-4 animate-fade-in">
-      <h3 className="text-lg font-medium mb-4">Convertisseur WAV vers MP3</h3>
+      <h3 className="text-lg font-medium mb-4">Convertisseur Audio</h3>
       
       <div 
         className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-center transition-all border-muted-foreground/30 hover:border-primary/50"
@@ -222,7 +220,7 @@ export const AudioConverter = () => {
                 className="transition-all duration-300 hover:shadow-md hover:translate-y-[-1px]"
               >
                 <Download className="h-4 w-4 mr-2" />
-                {isConverting ? "Conversion..." : "Convertir en MP3"}
+                {isConverting ? "Conversion..." : "Convertir"}
               </Button>
             </div>
           </div>
@@ -233,7 +231,7 @@ export const AudioConverter = () => {
               Glissez un fichier WAV ou cliquez pour parcourir
             </h4>
             <p className="text-xs text-muted-foreground mt-1">
-              Uniquement les fichiers WAV sont supportés pour la conversion
+              Uniquement les fichiers WAV sont supportés
             </p>
           </>
         )}
@@ -255,7 +253,7 @@ export const AudioConverter = () => {
       
       <div className="text-xs text-muted-foreground mt-4 p-3 bg-muted/50 rounded-md">
         <p>
-          <strong>Comment utiliser:</strong> Sélectionnez un fichier WAV, puis cliquez sur "Convertir en MP3" pour le télécharger au format MP3.
+          <strong>Comment utiliser:</strong> Sélectionnez un fichier WAV, puis cliquez sur "Convertir" pour le télécharger au format optimisé.
         </p>
       </div>
     </div>
