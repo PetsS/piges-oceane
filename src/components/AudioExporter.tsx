@@ -82,7 +82,7 @@ export const AudioExporter = ({
                   <FileDown className="h-4 w-4 mr-2" />
                 )}
                 {isExporting 
-                  ? `Traitement en cours... ${Math.round(exportProgress)}%` 
+                  ? `Encodage MP3... ${Math.round(exportProgress)}%` 
                   : exportError 
                     ? "Réessayer l'export" 
                     : "Exporter l'audio"}

@@ -1,6 +1,4 @@
-
-import { FFmpeg } from "@ffmpeg/ffmpeg";
-import { toBlobURL, fetchFile } from "@ffmpeg/util";
+import { Mp3Encoder } from "lamejs";
 
 export interface ExportProgressListener {
   onProgress: (progress: number) => void;
@@ -9,39 +7,10 @@ export interface ExportProgressListener {
 }
 
 export class FFmpegExporter {
-  private ffmpeg: FFmpeg | null = null;
-  private isLoaded = false;
-  private isLoading = false;
-  
-  constructor() {
-    this.ffmpeg = new FFmpeg();
-  }
+  private isLoaded = true; // Always true since we don't need to load external libraries
   
   async load(listener: ExportProgressListener): Promise<boolean> {
-    if (this.isLoaded) return true;
-    if (this.isLoading) return false;
-    
-    try {
-      this.isLoading = true;
-      
-      // Use direct import from CDN with correct paths
-      // In @ffmpeg/core@0.12.5, the files are directly in the package, not in /dist
-      console.log('Loading FFmpeg...');
-      await this.ffmpeg!.load({
-        coreURL: await toBlobURL('https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.5/ffmpeg-core.js', 'text/javascript'),
-        wasmURL: await toBlobURL('https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.5/ffmpeg-core.wasm', 'application/wasm')
-      });
-      
-      console.log('FFmpeg loaded successfully');
-      this.isLoaded = true;
-      this.isLoading = false;
-      return true;
-    } catch (error) {
-      console.error('Error loading FFmpeg:', error);
-      listener.onError(`Failed to load audio processor: ${error.message || 'Unknown error'}`);
-      this.isLoading = false;
-      return false;
-    }
+    return this.isLoaded;
   }
   
   async trimAudioToMP3(
@@ -51,51 +20,114 @@ export class FFmpegExporter {
     outputFilename: string,
     listener: ExportProgressListener
   ): Promise<void> {
-    if (!this.isLoaded) {
-      const loaded = await this.load(listener);
-      if (!loaded) {
-        return;
-      }
-    }
-    
     try {
-      // Set up progress monitoring
-      this.ffmpeg!.on('progress', ({ progress }) => {
-        listener.onProgress(progress * 100);
-      });
-      
       // Fetch the audio file
       console.log(`Fetching audio from: ${audioSource}`);
-      const inputData = await fetchFile(audioSource);
-      const inputFilename = 'input.mp3';
+      const response = await fetch(audioSource);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch audio: ${response.status} ${response.statusText}`);
+      }
       
-      // Write the input file to FFmpeg's virtual file system
-      await this.ffmpeg!.writeFile(inputFilename, inputData);
+      const arrayBuffer = await response.arrayBuffer();
       
-      // Format the start time and duration for FFmpeg command
-      const startTimeStr = this.formatTimeForFFmpeg(startTime);
-      const durationStr = this.formatTimeForFFmpeg(duration);
+      // Create an audio context to decode the audio
+      const audioContext = new AudioContext();
+      const audioData = await audioContext.decodeAudioData(arrayBuffer);
       
-      // Execute the FFmpeg command
-      console.log(`Executing FFmpeg command with start: ${startTimeStr}, duration: ${durationStr}`);
-      await this.ffmpeg!.exec([
-        '-i', inputFilename,
-        '-ss', startTimeStr,
-        '-t', durationStr,
-        '-acodec', 'libmp3lame',
-        '-q:a', '2', // Higher quality MP3
-        outputFilename
-      ]);
+      // Calculate the start and end sample positions
+      const startSample = Math.floor(startTime * audioData.sampleRate);
+      const endSample = Math.min(
+        Math.floor((startTime + duration) * audioData.sampleRate),
+        audioData.length
+      );
+      const sampleCount = endSample - startSample;
       
-      // Read the output file from FFmpeg's virtual file system
-      const outputData = await this.ffmpeg!.readFile(outputFilename);
+      // Prepare the data for MP3 encoding
+      const channels = audioData.numberOfChannels;
+      const sampleRate = audioData.sampleRate;
+      const bitRate = 192; // 192kbps, good quality
       
-      // Create a blob URL for the output file
-      const blob = new Blob([outputData], { type: 'audio/mp3' });
+      // Create MP3 encoder
+      const encoder = new Mp3Encoder(
+        Math.min(2, channels), // lamejs supports max 2 channels
+        sampleRate,
+        bitRate
+      );
+      
+      // Create buffer to hold the MP3 data
+      const mp3Data = [];
+      const blockSize = 1152; // This is a standard MP3 block size
+      
+      // Get audio data
+      const samplesLeft = new Float32Array(sampleCount);
+      const samplesRight = channels > 1 ? new Float32Array(sampleCount) : null;
+      
+      // Extract the portion of audio we want to keep
+      audioData.copyFromChannel(samplesLeft, 0, startSample);
+      if (channels > 1) {
+        audioData.copyFromChannel(samplesRight, 1, startSample);
+      }
+      
+      // Process the audio data in chunks
+      const totalChunks = Math.ceil(sampleCount / blockSize);
+      let currentChunk = 0;
+      
+      for (let i = 0; i < sampleCount; i += blockSize) {
+        const blockLength = Math.min(blockSize, sampleCount - i);
+        
+        // Prepare sample blocks
+        const leftBlock = new Int16Array(blockLength);
+        const rightBlock = channels > 1 ? new Int16Array(blockLength) : leftBlock;
+        
+        // Convert float samples to int16
+        for (let j = 0; j < blockLength; j++) {
+          // Convert float32 to int16 (-32768 to 32767)
+          leftBlock[j] = Math.max(-32768, Math.min(32767, samplesLeft[i + j] * 32767));
+          if (channels > 1) {
+            rightBlock[j] = Math.max(-32768, Math.min(32767, samplesRight[i + j] * 32767));
+          }
+        }
+        
+        // Encode this block
+        const mp3Block = encoder.encodeBuffer(leftBlock, rightBlock);
+        if (mp3Block.length > 0) {
+          mp3Data.push(mp3Block);
+        }
+        
+        currentChunk++;
+        const progress = (currentChunk / totalChunks) * 95; // Up to 95%
+        listener.onProgress(progress);
+      }
+      
+      // Finalize the encoding
+      const finalBlock = encoder.flush();
+      if (finalBlock.length > 0) {
+        mp3Data.push(finalBlock);
+      }
+      
+      listener.onProgress(95);
+      
+      // Concatenate the MP3 chunks
+      let totalLength = 0;
+      mp3Data.forEach(chunk => totalLength += chunk.length);
+      const mp3Buffer = new Uint8Array(totalLength);
+      
+      let offset = 0;
+      mp3Data.forEach(chunk => {
+        mp3Buffer.set(chunk, offset);
+        offset += chunk.length;
+      });
+      
+      // Create a blob and URL
+      const blob = new Blob([mp3Buffer], { type: 'audio/mp3' });
       const url = URL.createObjectURL(blob);
       
-      console.log('Audio export complete');
+      listener.onProgress(100);
       listener.onComplete(url, outputFilename);
+      
+      // Close the audio context when done
+      audioContext.close();
+      
     } catch (error) {
       console.error('Error exporting audio:', error);
       listener.onError(`Error processing audio: ${error.message || 'Unknown error'}`);
@@ -112,12 +144,7 @@ export class FFmpegExporter {
   }
   
   terminate() {
-    if (this.ffmpeg) {
-      this.ffmpeg.terminate();
-      this.ffmpeg = null;
-      this.isLoaded = false;
-      this.isLoading = false;
-    }
+    // No need to terminate anything when using lamejs
   }
 }
 
