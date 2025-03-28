@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useAudioContext } from './useAudioContext';
@@ -46,7 +47,10 @@ export const useAudio = () => {
     setAudioBuffer,
     setIsPlaying,
     setCurrentTime,
-    setDuration,
+    (duration) => {
+      setDuration(duration);
+      initializeMarkers(duration);
+    },
     getAudioContext,
     audioRef,
     audioSrc
@@ -63,6 +67,24 @@ export const useAudio = () => {
       audioRef.current = audio;
     }
   }, [volume]);
+
+  // Initialize markers with duration
+  const initializeMarkers = (audioDuration: number) => {
+    if (audioDuration > 0 && (!markers || markers.length === 0)) {
+      setMarkers([
+        {
+          id: `start-${Date.now()}`,
+          position: 0,
+          type: 'start'
+        },
+        {
+          id: `end-${Date.now() + 1}`,
+          position: audioDuration,
+          type: 'end'
+        }
+      ]);
+    }
+  };
   
   // Toggle play/pause with direct HTMLAudioElement usage
   const togglePlay = () => {
@@ -286,7 +308,7 @@ export const useAudio = () => {
     };
   }, []);
 
-  // Export trimmed audio using the original file format - optimized version
+  // Export trimmed audio using the original file format
   const exportTrimmedAudio = async () => {
     const startMarker = markers.find(marker => marker.type === 'start');
     const endMarker = markers.find(marker => marker.type === 'end');
@@ -304,6 +326,15 @@ export const useAudio = () => {
     if (!audioRef.current && !audioBuffer) {
       toast.error("Aucun fichier audio chargé");
       return;
+    }
+    
+    // Save playback state to restore later
+    const wasPlaying = isPlaying;
+    const originalPosition = currentTime;
+    
+    if (isPlaying) {
+      audioRef.current?.pause();
+      setIsPlaying(false);
     }
     
     setIsExporting(true);
@@ -326,98 +357,175 @@ export const useAudio = () => {
         (currentAudioFile.name.toLowerCase().endsWith('.wav') ? 'audio/wav' : 'audio/mpeg') : 
         'audio/mpeg';
       
-      // Create a temporary audio element for the source
-      const tempAudio = new Audio(audioElement.src);
+      setExportProgress(15);
+      toast.info("Préparation de l'export...");
+      
+      // Create a temporary audio element for the source that won't affect our UI
+      const tempAudio = new Audio();
+      tempAudio.src = audioElement.src;
       tempAudio.crossOrigin = "anonymous";
+      
+      setExportProgress(25);
       
       // Set up audio processing
       const ctx = new AudioContext();
-      const source = ctx.createMediaElementSource(tempAudio);
       const destination = ctx.createMediaStreamDestination();
-      source.connect(destination);
       
-      setExportProgress(20);
-      
-      // Create MediaRecorder with proper mime type
-      const mimeType = originalFileType === 'audio/wav' ? 
-        (MediaRecorder.isTypeSupported('audio/wav') ? 'audio/wav' : 'audio/webm') : 
-        (MediaRecorder.isTypeSupported('audio/mpeg') ? 'audio/mpeg' : 'audio/webm');
-      
-      const mediaRecorder = new MediaRecorder(destination.stream, {
-        mimeType: MediaRecorder.isTypeSupported(mimeType) ? mimeType : 'audio/webm'
-      });
-      
-      const chunks: Blob[] = [];
-      
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          chunks.push(e.data);
-        }
-      };
-      
-      mediaRecorder.onstop = () => {
-        setExportProgress(90);
-        
-        // Create the blob from all chunks
-        const blob = new Blob(chunks, { type: originalFileType });
-        const url = URL.createObjectURL(blob);
-        
-        // Get appropriate file extension
-        const fileExt = originalFileType === 'audio/wav' ? '.wav' : '.mp3';
-        
-        // Trigger download
-        const fileName = currentAudioFile 
-          ? `${currentAudioFile.name.replace(/\.[^/.]+$/, '')}_trim${fileExt}`
-          : `audio_trim_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}${fileExt}`;
-        
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = fileName;
-        a.style.display = 'none';
-        document.body.appendChild(a);
-        a.click();
-        
-        // Clean up
-        setTimeout(() => {
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-          ctx.close();
-          setExportProgress(100);
-          toast.success("Export réussi");
+      // Wait for the temp audio to be ready
+      tempAudio.addEventListener('canplay', () => {
+        try {
+          const source = ctx.createMediaElementSource(tempAudio);
+          source.connect(destination);
           
-          setTimeout(() => {
-            setIsExporting(false);
-            setExportProgress(0);
-          }, 1000);
-        }, 100);
-      };
+          setExportProgress(35);
+          
+          // Determine the best MIME type for recording
+          const getMimeType = () => {
+            // First check specific format support
+            if (originalFileType === 'audio/wav' && MediaRecorder.isTypeSupported('audio/wav')) {
+              return 'audio/wav';
+            } else if (originalFileType === 'audio/mpeg' && MediaRecorder.isTypeSupported('audio/mpeg')) {
+              return 'audio/mpeg';
+            }
+            
+            // Fallbacks in order of preference
+            const types = [
+              'audio/webm',
+              'audio/webm;codecs=opus',
+              'audio/ogg',
+              'audio/ogg;codecs=opus'
+            ];
+            
+            for (const type of types) {
+              if (MediaRecorder.isTypeSupported(type)) {
+                return type;
+              }
+            }
+            
+            // Last resort
+            return '';
+          };
+          
+          const mimeType = getMimeType();
+          console.log("Using MIME type for export:", mimeType);
+          
+          // Create MediaRecorder with appropriate options
+          const mediaRecorder = mimeType ? 
+            new MediaRecorder(destination.stream, { mimeType }) : 
+            new MediaRecorder(destination.stream);
+          
+          const chunks: Blob[] = [];
+          
+          mediaRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) {
+              chunks.push(e.data);
+            }
+          };
+          
+          mediaRecorder.onstop = () => {
+            setExportProgress(85);
+            toast.info("Finalisation de l'export...");
+            
+            // Get appropriate file extension
+            const fileExt = originalFileType === 'audio/wav' ? '.wav' : '.mp3';
+            
+            // Create the blob from all chunks
+            const blob = new Blob(chunks, { type: mimeType || originalFileType });
+            const url = URL.createObjectURL(blob);
+            
+            // Trigger download
+            const fileName = currentAudioFile 
+              ? `${currentAudioFile.name.replace(/\.[^/.]+$/, '')}_trim${fileExt}`
+              : `audio_trim_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}${fileExt}`;
+            
+            setExportProgress(95);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            
+            // Clean up
+            setTimeout(() => {
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+              ctx.close();
+              setExportProgress(100);
+              
+              toast.success("Export réussi");
+              
+              // Restore original playback position
+              if (audioRef.current) {
+                audioRef.current.currentTime = originalPosition;
+                setCurrentTime(originalPosition);
+                
+                // Resume playback if it was playing before
+                if (wasPlaying) {
+                  audioRef.current.play()
+                    .then(() => setIsPlaying(true))
+                    .catch(console.error);
+                }
+              }
+              
+              setTimeout(() => {
+                setIsExporting(false);
+                setExportProgress(0);
+              }, 1000);
+            }, 100);
+          };
+          
+          // Start recording
+          mediaRecorder.start(100); // Collect data in 100ms chunks
+          setExportProgress(45);
+          toast.info("Enregistrement en cours...");
+          
+          // Set the position and play just the part we want to export
+          tempAudio.currentTime = startTime;
+          
+          tempAudio.addEventListener('timeupdate', function timeUpdateHandler() {
+            const progress = ((tempAudio.currentTime - startTime) / duration) * 40 + 45;
+            setExportProgress(Math.min(85, progress));
+            
+            if (tempAudio.currentTime >= endTime) {
+              tempAudio.removeEventListener('timeupdate', timeUpdateHandler);
+              tempAudio.pause();
+              mediaRecorder.stop();
+            }
+          });
+          
+          tempAudio.play().catch(playError => {
+            console.error("Error playing audio for export:", playError);
+            throw new Error("Erreur lors de la lecture pour l'export");
+          });
+          
+        } catch (processingError) {
+          console.error("Error processing audio:", processingError);
+          throw new Error(`Erreur de traitement audio: ${processingError.message}`);
+        }
+      }, { once: true });
       
-      // Start recording
-      mediaRecorder.start();
-      setExportProgress(30);
+      // Handle loading errors on the temp audio
+      tempAudio.addEventListener('error', (e) => {
+        console.error("Error loading audio for export:", e);
+        throw new Error("Erreur de chargement du fichier audio pour l'export");
+      }, { once: true });
       
-      // Set the position and play just the part we want to export
-      tempAudio.currentTime = startTime;
-      setExportProgress(40);
-      
-      tempAudio.play().then(() => {
-        setExportProgress(50);
-        
-        // Stop after duration
-        setTimeout(() => {
-          tempAudio.pause();
-          mediaRecorder.stop();
-          setExportProgress(70);
-        }, duration * 1000);
-      }).catch(playError => {
-        console.error("Error playing audio for export:", playError);
-        throw new Error("Erreur lors de la lecture pour l'export");
-      });
+      // Start loading the audio
+      tempAudio.load();
       
     } catch (error) {
       console.error("Error exporting audio:", error);
       setExportError(`Erreur: ${error.message || "Échec de l'export"}`);
       toast.error(`Erreur lors de l'export: ${error.message || "Échec de l'export"}`);
+      
+      // Always restore original playback state on error
+      if (audioRef.current) {
+        audioRef.current.currentTime = originalPosition;
+        setCurrentTime(originalPosition);
+      }
+      
       setIsExporting(false);
     }
   };
