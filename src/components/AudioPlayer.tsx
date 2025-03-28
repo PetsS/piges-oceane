@@ -116,6 +116,7 @@ export const AudioPlayer = memo(({
 
   const handleAddMarker = useCallback((type: 'start' | 'end') => {
     if (onAddMarker) {
+      // We directly pass the type now; current time is handled in the hook
       onAddMarker(type, currentTime);
     }
   }, [onAddMarker, currentTime]);
