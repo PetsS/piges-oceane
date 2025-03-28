@@ -1,4 +1,3 @@
-
 import { useState, useCallback, memo, useEffect, useRef } from "react";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
@@ -41,7 +40,6 @@ interface AudioPlayerProps {
   exportProgress?: number;
 }
 
-// Use memo to prevent unnecessary re-renders
 export const AudioPlayer = memo(({
   isPlaying,
   currentTime,
@@ -73,7 +71,6 @@ export const AudioPlayer = memo(({
   
   const canExport = startMarker && endMarker && startMarker.position < endMarker.position;
   
-  // Enable playback controls once audio is loaded
   useEffect(() => {
     if (duration > 0 && !isLoading) {
       setPlaybackEnabled(true);
@@ -100,27 +97,22 @@ export const AudioPlayer = memo(({
     return <Volume2 className="h-5 w-5" />;
   }, [volume]);
 
-  // Handle play/pause with improved error handling
   const handlePlayPause = useCallback(() => {
     try {
       console.log("Play/pause button clicked");
       
-      // Focus the button to trigger any potential user interaction handlers
       if (playButtonRef.current) {
         playButtonRef.current.focus();
       }
       
-      // Call the provided play/pause handler
       onPlayPause();
       
-      // Add visual feedback
       setTimeout(() => playButtonRef.current?.blur(), 100);
     } catch (error) {
       console.error("Error in play/pause handler:", error);
     }
   }, [onPlayPause]);
 
-  // Handle adding marker without disturbing playback
   const handleAddMarker = useCallback((type: 'start' | 'end') => {
     if (onAddMarker) {
       onAddMarker(type, currentTime);
@@ -128,7 +120,6 @@ export const AudioPlayer = memo(({
     }
   }, [onAddMarker, currentTime, formatTime]);
 
-  // Toggle marker controls visibility
   const toggleMarkerControls = useCallback(() => {
     setShowMarkerControls(prev => !prev);
   }, []);
