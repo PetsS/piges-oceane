@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { AudioMarker } from './useAudioTypes';
 import { useAudioContext } from './useAudioContext';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
-import { fetchFile } from '@ffmpeg/util';
+import { fetchFile, toBlobURL } from '@ffmpeg/util';
 
 export const useAudioExport = (
   audioBuffer: AudioBuffer | null,
@@ -101,10 +101,12 @@ export const useAudioExport = (
         console.log(`FFmpeg processing: ${Math.floor(progress * 100)}%`);
       });
       
-      // Load FFmpeg with CDN build (for browser support)
+      // Load FFmpeg with self-hosted files instead of CDN
+      // This is more reliable as it doesn't depend on external CDN availability
       await ffmpeg.load({
-        coreURL: 'https://unpkg.com/@ffmpeg/core@0.12.4/dist/ffmpeg-core.js',
-        wasmURL: 'https://unpkg.com/@ffmpeg/core@0.12.4/dist/ffmpeg-core.wasm',
+        // Instead of using unpkg, we'll use the direct files from the package
+        coreURL: await toBlobURL('@ffmpeg/core', 'dist/ffmpeg-core.js'),
+        wasmURL: await toBlobURL('@ffmpeg/core', 'dist/ffmpeg-core.wasm'),
       });
       
       ffmpegRef.current = ffmpeg;
@@ -242,6 +244,7 @@ export const useAudioExport = (
       }
       
       toast.success('Traitement du segment audio...', { duration: 2000 });
+      setExportProgress(10);
       
       const audioContext = getAudioContext();
       if (!audioContext) {
@@ -281,6 +284,7 @@ export const useAudioExport = (
         }
       }
       
+      setExportProgress(20);
       console.log("Trimmed buffer created successfully, proceeding to MP3 export with FFmpeg");
       
       // Convert trimmed AudioBuffer to WAV for FFmpeg processing
@@ -288,6 +292,7 @@ export const useAudioExport = (
       const wavBlob = new Blob([wavData], { type: 'audio/wav' });
       
       console.log("WAV blob created, size:", wavBlob.size);
+      setExportProgress(30);
       
       // Generate filename for the exported audio
       const fileName = currentAudioFile ? 
@@ -304,6 +309,7 @@ export const useAudioExport = (
         console.log("Writing input WAV to FFmpeg virtual filesystem");
         await ffmpeg.writeFile(inputFileName, await fetchFile(wavBlob));
         console.log("Input WAV written successfully");
+        setExportProgress(50);
         
         // Run FFmpeg command to convert WAV to MP3 with high quality
         console.log("Starting FFmpeg conversion process");
@@ -317,6 +323,7 @@ export const useAudioExport = (
         console.log("Running FFmpeg command:", ffmpegCommand.join(' '));
         await ffmpeg.exec(ffmpegCommand);
         console.log("FFmpeg conversion completed successfully");
+        setExportProgress(80);
         
         // Read the output file from FFmpeg's virtual file system
         console.log("Reading output MP3 from FFmpeg virtual filesystem");
@@ -329,6 +336,7 @@ export const useAudioExport = (
         
         const mp3Blob = new Blob([outputData], { type: 'audio/mp3' });
         console.log("MP3 blob created, size:", mp3Blob.size);
+        setExportProgress(90);
         
         if (mp3Blob.size === 0) {
           throw new Error("Generated MP3 file is empty");
@@ -368,7 +376,7 @@ export const useAudioExport = (
         setExportProgress(100);
       } catch (ffmpegError) {
         console.error("FFmpeg processing error:", ffmpegError);
-        throw new Error("Failed to convert audio to MP3");
+        throw new Error("Failed to convert audio to MP3: " + ffmpegError.message);
       }
     } catch (error) {
       console.error('Error exporting audio:', error);
