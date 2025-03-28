@@ -24,13 +24,13 @@ export class FFmpegExporter {
     try {
       this.isLoading = true;
       
-      // Load FFmpeg with the correct URL format
-      const baseURL = 'https://unpkg.com/@ffmpeg';
+      // Use jsdelivr CDN instead of unpkg
+      const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.5/dist';
       
       console.log('Loading FFmpeg...');
       await this.ffmpeg!.load({
-        coreURL: await toBlobURL(`${baseURL}/core/dist/ffmpeg-core.js`, 'text/javascript'),
-        wasmURL: await toBlobURL(`${baseURL}/core/dist/ffmpeg-core.wasm`, 'application/wasm')
+        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm')
       });
       
       console.log('FFmpeg loaded successfully');
