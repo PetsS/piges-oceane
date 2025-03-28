@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useAudioContext } from './useAudioContext';
@@ -5,7 +6,6 @@ import { useAudioFormatting } from './useAudioFormatting';
 import { useAudioPlayback } from './useAudioPlayback';
 import { useAudioFiles } from './useAudioFiles';
 import { AudioMarker, AudioFile } from './useAudioTypes';
-import { ffmpegExporter } from '@/utils/ffmpegExporter';
 
 export type { AudioMarker, AudioFile };
 
@@ -248,86 +248,62 @@ export const useAudio = () => {
     };
   }, []);
 
-  // Export audio with FFmpeg
+  // Placeholder for export function
   const exportTrimmedAudio = async () => {
     // Reset the error state when starting a new export
     setExportError(null);
-    
-    // Check if markers are set
-    const startMarker = markers.find(marker => marker.type === 'start');
-    const endMarker = markers.find(marker => marker.type === 'end');
-    
-    if (!startMarker || !endMarker) {
-      toast.error("Please set both start and end markers");
-      setExportError("Missing markers");
-      return;
-    }
-    
-    if (startMarker.position >= endMarker.position) {
-      toast.error("Start marker must be before end marker");
-      setExportError("Invalid marker positions");
-      return;
-    }
-    
-    if (!audioSrc) {
-      toast.error("No audio source available");
-      setExportError("No audio source");
-      return;
-    }
-    
-    // Start export process
     setIsExporting(true);
     setExportProgress(0);
     
     try {
-      // Calculate duration
-      const duration = endMarker.position - startMarker.position;
+      // Check if markers are set
+      const startMarker = markers.find(marker => marker.type === 'start');
+      const endMarker = markers.find(marker => marker.type === 'end');
       
-      // Generate output filename
-      const filename = currentAudioFile 
-        ? `${currentAudioFile.name.split('.')[0]}_trimmed.mp3`
-        : 'trimmed_audio.mp3';
+      if (!startMarker || !endMarker) {
+        toast.error("Please set both start and end markers");
+        setExportError("Missing markers");
+        return;
+      }
       
-      toast.info("Starting MP3 encoding...", { duration: 3000 });
+      if (startMarker.position >= endMarker.position) {
+        toast.error("Start marker must be before end marker");
+        setExportError("Invalid marker positions");
+        return;
+      }
       
-      // Export the audio using our FFmpeg utility
-      await ffmpegExporter.trimAudioToMP3(
-        audioSrc,
-        startMarker.position,
-        duration,
-        filename,
-        {
-          onProgress: (progress) => {
-            setExportProgress(progress);
-          },
-          onComplete: (url, filename) => {
-            setIsExporting(false);
-            setExportProgress(100);
-            
-            // Create a download link
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            a.style.display = 'none';
-            document.body.appendChild(a);
-            a.click();
-            
-            // Clean up
-            setTimeout(() => {
-              document.body.removeChild(a);
-              URL.revokeObjectURL(url);
-            }, 100);
-            
-            toast.success("Audio exported successfully!");
-          },
-          onError: (error) => {
-            console.error('Export error:', error);
-            setExportError(error);
-            setIsExporting(false);
-            toast.error(`Export failed: ${error}`);
+      if (!audioSrc) {
+        toast.error("No audio source available");
+        setExportError("No audio source");
+        return;
+      }
+      
+      // Placeholder for actual export process
+      toast.info("Export functionality is being rebuilt", { 
+        description: "The export module is currently being redeveloped",
+        duration: 3000 
+      });
+      
+      // Simulate progress for UI feedback
+      const interval = setInterval(() => {
+        setExportProgress(prev => {
+          if (prev >= 95) {
+            clearInterval(interval);
+            return prev;
           }
-        }
-      );
+          return prev + 5;
+        });
+      }, 200);
+      
+      // Finish the simulation after 2 seconds
+      setTimeout(() => {
+        clearInterval(interval);
+        setIsExporting(false);
+        setExportProgress(0);
+        setExportError("Export module is being rebuilt");
+        toast.info("Export functionality will be available soon");
+      }, 2000);
+      
     } catch (error) {
       console.error('Export error:', error);
       setExportError(error.message || "Unknown error");
