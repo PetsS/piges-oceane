@@ -47,7 +47,7 @@ export class FFmpegExporter {
       const sampleRate = audioData.sampleRate;
       const bitRate = 192; // 192kbps, good quality
       
-      // Create MP3 encoder
+      // Create MP3 encoder - corrected implementation
       const encoder = new Mp3Encoder(
         Math.min(2, channels), // lamejs supports max 2 channels
         sampleRate,
@@ -64,7 +64,7 @@ export class FFmpegExporter {
       
       // Extract the portion of audio we want to keep
       audioData.copyFromChannel(samplesLeft, 0, startSample);
-      if (channels > 1) {
+      if (channels > 1 && samplesRight) {
         audioData.copyFromChannel(samplesRight, 1, startSample);
       }
       
@@ -82,9 +82,9 @@ export class FFmpegExporter {
         // Convert float samples to int16
         for (let j = 0; j < blockLength; j++) {
           // Convert float32 to int16 (-32768 to 32767)
-          leftBlock[j] = Math.max(-32768, Math.min(32767, samplesLeft[i + j] * 32767));
-          if (channels > 1) {
-            rightBlock[j] = Math.max(-32768, Math.min(32767, samplesRight[i + j] * 32767));
+          leftBlock[j] = Math.max(-32768, Math.min(32767, Math.round(samplesLeft[i + j] * 32767)));
+          if (channels > 1 && samplesRight) {
+            rightBlock[j] = Math.max(-32768, Math.min(32767, Math.round(samplesRight[i + j] * 32767)));
           }
         }
         
