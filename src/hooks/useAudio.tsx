@@ -32,21 +32,6 @@ export const useAudio = () => {
   const { getAudioContext, isContextReady } = useAudioContext();
   const { formatTime, formatTimeDetailed } = useAudioFormatting();
   
-  // Initialize playback controls with partial dependencies to avoid circular dependencies
-  const playback = useAudioPlayback();
-  
-  // Initialize audio element if it doesn't exist
-  useEffect(() => {
-    if (!audioRef.current) {
-      console.log("Creating new Audio element in useAudio");
-      const audio = new Audio();
-      audio.volume = volume;
-      audio.preload = "auto";
-      audio.crossOrigin = "anonymous";
-      audioRef.current = audio;
-    }
-  }, [volume]);
-  
   // Initialize files management
   const { 
     audioFiles, 
@@ -104,10 +89,23 @@ export const useAudio = () => {
     setMarkers(markers.filter(marker => marker.id !== id));
   };
   
+  // Initialize audio element if it doesn't exist
+  useEffect(() => {
+    if (!audioRef.current) {
+      console.log("Creating new Audio element in useAudio");
+      const audio = new Audio();
+      audio.volume = volume;
+      audio.preload = "auto";
+      audio.crossOrigin = "anonymous";
+      audioRef.current = audio;
+    }
+  }, [volume]);
+  
   // Toggle play/pause with direct HTMLAudioElement usage
   const togglePlay = () => {
     if (!audioRef.current) {
       console.error("No audio element available");
+      toast.error("Audio player not initialized");
       return;
     }
     
@@ -124,10 +122,59 @@ export const useAudio = () => {
     if (!isPlaying) {
       setIsBuffering(true);
       
-      // Ensure source is set
-      if (!audioRef.current.src && audioSrc) {
+      // For synthetic audio or network files, play a silent audio buffer
+      if (audioSrc === 'synthetic-audio' && audioBuffer) {
+        console.log("Playing synthetic audio from buffer");
+        
+        try {
+          const context = getAudioContext();
+          if (!context) {
+            throw new Error("AudioContext not available");
+          }
+          
+          // Create a source node
+          const source = context.createBufferSource();
+          source.buffer = audioBuffer;
+          source.connect(context.destination);
+          
+          // Set up time tracking
+          let startTime = context.currentTime;
+          
+          const updateTimer = () => {
+            if (isPlaying) {
+              const elapsedTime = context.currentTime - startTime;
+              setCurrentTime(elapsedTime);
+              requestAnimationFrame(updateTimer);
+            }
+          };
+          
+          // Start playback
+          source.start(0);
+          setIsPlaying(true);
+          setIsBuffering(false);
+          requestAnimationFrame(updateTimer);
+          
+          // Handle when playback ends
+          source.onended = () => {
+            setIsPlaying(false);
+            console.log("Synthetic audio playback ended");
+          };
+        } catch (error) {
+          console.error("Error playing synthetic audio:", error);
+          setIsBuffering(false);
+          toast.error("Error playing audio");
+        }
+        return;
+      }
+      
+      // Ensure source is set for regular audio files
+      if (audioSrc && audioSrc !== 'synthetic-audio') {
         console.log("Setting audio src to:", audioSrc);
         audioRef.current.src = audioSrc;
+        audioRef.current.load();
+      } else if (!audioSrc && currentAudioFile) {
+        console.log("No audio src but have file, setting src to:", currentAudioFile.path);
+        audioRef.current.src = currentAudioFile.path;
         audioRef.current.load();
       }
       
@@ -248,68 +295,11 @@ export const useAudio = () => {
     };
   }, []);
 
-  // Placeholder for export function
-  const exportTrimmedAudio = async () => {
-    // Reset the error state when starting a new export
-    setExportError(null);
-    setIsExporting(true);
-    setExportProgress(0);
-    
-    try {
-      // Check if markers are set
-      const startMarker = markers.find(marker => marker.type === 'start');
-      const endMarker = markers.find(marker => marker.type === 'end');
-      
-      if (!startMarker || !endMarker) {
-        toast.error("Please set both start and end markers");
-        setExportError("Missing markers");
-        return;
-      }
-      
-      if (startMarker.position >= endMarker.position) {
-        toast.error("Start marker must be before end marker");
-        setExportError("Invalid marker positions");
-        return;
-      }
-      
-      if (!audioSrc) {
-        toast.error("No audio source available");
-        setExportError("No audio source");
-        return;
-      }
-      
-      // Placeholder for actual export process
-      toast.info("Export functionality is being rebuilt", { 
-        description: "The export module is currently being redeveloped",
-        duration: 3000 
-      });
-      
-      // Simulate progress for UI feedback
-      const interval = setInterval(() => {
-        setExportProgress(prev => {
-          if (prev >= 95) {
-            clearInterval(interval);
-            return prev;
-          }
-          return prev + 5;
-        });
-      }, 200);
-      
-      // Finish the simulation after 2 seconds
-      setTimeout(() => {
-        clearInterval(interval);
-        setIsExporting(false);
-        setExportProgress(0);
-        setExportError("Export module is being rebuilt");
-        toast.info("Export functionality will be available soon");
-      }, 2000);
-      
-    } catch (error) {
-      console.error('Export error:', error);
-      setExportError(error.message || "Unknown error");
-      setIsExporting(false);
-      toast.error("Failed to export audio");
-    }
+  // Placeholder function that always returns false to disable export
+  const exportTrimmedAudio = () => {
+    toast.info("Fonction d'export désactivée", {
+      description: "La fonctionnalité d'export a été désactivée temporairement."
+    });
   };
   
   return {
@@ -324,9 +314,9 @@ export const useAudio = () => {
     currentAudioFile,
     isBuffering,
     showMarkerControls,
-    isExporting,
-    exportProgress,
-    exportError,
+    isExporting: false, // Always false since we've removed export functionality
+    exportProgress: 0,
+    exportError: null,
     setShowMarkerControls,
     togglePlay,
     seek,

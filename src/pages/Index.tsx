@@ -2,13 +2,10 @@
 import { useState } from "react";
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { FileBrowser } from "@/components/FileBrowser";
-import { MarkerControls } from "@/components/MarkerControls";
 import { LocalAudioLoader } from "@/components/LocalAudioLoader";
 import { useAudio } from "@/hooks/useAudio";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Headphones } from "lucide-react";
 import { useSettings } from "@/contexts/SettingsContext";
-import { Button } from "@/components/ui/button";
 
 const Index = () => {
   const { settings } = useSettings();
@@ -16,14 +13,9 @@ const Index = () => {
   const {
     audioFiles,
     isLoading,
-    markers,
-    addMarker,
-    removeMarker,
-    exportTrimmedAudio,
     loadAudioFile,
     loadFilesFromUNC,
     formatTime,
-    formatTimeDetailed,
     isPlaying,
     currentTime,
     duration,
@@ -32,21 +24,14 @@ const Index = () => {
     seek,
     changeVolume,
     currentAudioFile,
-    isBuffering,
-    showMarkerControls,
-    setShowMarkerControls,
-    isExporting,
-    exportProgress,
-    exportError
+    isBuffering
   } = useAudio();
 
   const handleFileSelect = (file) => {
-    setShowMarkerControls(false);
     loadAudioFile(file);
   };
 
   const handleSearch = (path, city, date, hour) => {
-    setShowMarkerControls(false);
     loadFilesFromUNC(path, city, date, hour);
   };
 
@@ -111,33 +96,6 @@ const Index = () => {
               isLoading={isLoading}
               isBuffering={isBuffering}
             />
-          </div>
-
-          <div className="h-fit">
-            {currentAudioFile && !showMarkerControls && (
-              <div className="flex justify-end mb-4">
-                <Button 
-                  onClick={() => setShowMarkerControls(true)}
-                  className="animate-fade-in"
-                >
-                  <Headphones className="h-4 w-4 mr-2" />
-                  Edit audio
-                </Button>
-              </div>
-            )}
-            
-            {showMarkerControls && (
-              <MarkerControls
-                markers={markers}
-                onAddMarker={addMarker}
-                onExport={exportTrimmedAudio}
-                currentTime={currentTime}
-                formatTimeDetailed={formatTimeDetailed}
-                isExporting={isExporting}
-                exportProgress={exportProgress}
-                exportError={exportError}
-              />
-            )}
           </div>
         </div>
       </div>
