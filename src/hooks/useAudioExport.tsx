@@ -3,6 +3,7 @@ import { useRef, useCallback } from 'react';
 import { toast } from 'sonner';
 import { AudioMarker } from './useAudioTypes';
 import { useAudioContext } from './useAudioContext';
+import * as lamejs from 'lamejs';
 
 export const useAudioExport = (
   audioBuffer: AudioBuffer | null,
@@ -53,21 +54,53 @@ export const useAudioExport = (
           
           if (url.startsWith('blob:')) {
             const response = await fetch(url);
+            
+            if (!response.ok) {
+              throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
+            }
+            
             const arrayBuffer = await response.arrayBuffer();
+            console.log("Blob URL fetched successfully, buffer size:", arrayBuffer.byteLength);
+            
+            if (arrayBuffer.byteLength === 0) {
+              console.error("Error: Empty array buffer received");
+              throw new Error("Empty audio file");
+            }
+            
+            // Double-check audioContext is still valid
+            if (audioContext.state === 'closed') {
+              console.log("AudioContext was closed, creating a new one");
+              const newContext = getAudioContext();
+              if (!newContext) {
+                throw new Error("Failed to create new AudioContext");
+              }
+              
+              if (newContext.state === 'suspended') {
+                await newContext.resume();
+              }
+              
+              const audioBuffer = await newContext.decodeAudioData(arrayBuffer.slice(0));
+              console.log("Audio data decoded successfully with new context, duration:", audioBuffer.duration);
+              return audioBuffer;
+            }
             
             try {
-              bufferToExport = await audioContext.decodeAudioData(arrayBuffer);
-              console.log("Successfully decoded audio from URL");
+              // Create a copy of the buffer to avoid potential issues with buffer reuse
+              const bufferCopy = arrayBuffer.slice(0);
+              
+              // Decode the audio data
+              console.log("Attempting to decode audio data, context state:", audioContext.state);
+              const audioBuffer = await audioContext.decodeAudioData(bufferCopy);
+              console.log("Audio data decoded successfully, duration:", audioBuffer.duration);
+              bufferToExport = audioBuffer;
             } catch (decodeError) {
-              console.error("Failed to decode audio data:", decodeError);
-              throw new Error("Error decoding audio data");
+              console.error("Error decoding audio data:", decodeError);
+              throw decodeError;
             }
           }
         } catch (error) {
-          console.error("Error creating buffer:", error);
-          toast.error('Erreur lors de la préparation de l\'audio pour l\'export');
-          processingRef.current = false;
-          return;
+          console.error("Error fetching blob URL:", error);
+          throw error;
         }
       }
       
@@ -189,9 +222,9 @@ export const useAudioExport = (
   // Convert AudioBuffer to MP3 format using lamejs library
   function audioBufferToMp3(buffer: AudioBuffer): Uint8Array[] {
     try {
-      // Import lamejs directly to avoid TypeScript errors
-      const lamejs = require('lamejs');
+      console.log("Starting MP3 encoding with lamejs...");
       
+      // Get buffer parameters
       const channels = buffer.numberOfChannels;
       const sampleRate = buffer.sampleRate;
       const samples = buffer.getChannelData(0);
@@ -204,7 +237,7 @@ export const useAudioExport = (
       const sampleBlockSize = 1152; // Default MP3 sample block size
       
       // Create MP3 encoder
-      // Using explicit numbers for MP3 modes - 1 = JOINT_STEREO, 3 = MONO
+      // Using explicit numbers for MP3 modes - JOINT_STEREO = 1, MONO = 3
       const mp3encoder = channels > 1 
         ? new lamejs.Mp3Encoder(2, sampleRate, bitRate) // Stereo
         : new lamejs.Mp3Encoder(1, sampleRate, bitRate); // Mono
