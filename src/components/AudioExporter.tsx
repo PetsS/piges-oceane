@@ -1,6 +1,6 @@
 
 import { Button } from "@/components/ui/button";
-import { Scissors, FileDown } from "lucide-react";
+import { FileDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { AudioMarker } from "@/hooks/useAudio";
 import {
@@ -9,8 +9,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Progress } from "@/components/ui/progress";
-import { useState, useEffect } from "react";
 
 interface AudioExporterProps {
   markers: AudioMarker[];
@@ -28,22 +26,9 @@ export const AudioExporter = ({
   isExporting,
   formatTimeDetailed,
   canExport,
-  exportProgress = 0,
-  exportError = null,
 }: AudioExporterProps) => {
   const startMarker = markers.find((marker) => marker.type === "start");
   const endMarker = markers.find((marker) => marker.type === "end");
-  
-  const [showRetry, setShowRetry] = useState(false);
-  
-  // Reset retry button when export is successful or starts again
-  useEffect(() => {
-    if (!isExporting && !exportError) {
-      setShowRetry(false);
-    } else if (!isExporting && exportError) {
-      setShowRetry(true);
-    }
-  }, [isExporting, exportError]);
 
   return (
     <div className="space-y-3">
@@ -68,55 +53,24 @@ export const AudioExporter = ({
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
-            <div className="space-y-2">
+            <div>
               <Button
-                disabled={!canExport || (isExporting && !showRetry)}
-                onClick={onExport}
-                className={`w-full transition-all duration-300 hover:shadow-md hover:translate-y-[-1px] ${
-                  exportError ? 'bg-amber-500 hover:bg-amber-600' : ''
-                }`}
+                disabled={true}
+                className="w-full opacity-50 cursor-not-allowed"
               >
-                {isExporting ? (
-                  <Scissors className="h-4 w-4 mr-2 animate-pulse" />
-                ) : exportError ? (
-                  <FileDown className="h-4 w-4 mr-2" />
-                ) : (
-                  <FileDown className="h-4 w-4 mr-2" />
-                )}
-                {isExporting 
-                  ? `Encodage MP3... ${Math.round(exportProgress)}%` 
-                  : exportError?.includes("being rebuilt")
-                    ? "Export en cours de reconstruction" 
-                    : "Exporter l'audio"}
-                
-                {isExporting && (
-                  <Badge variant="outline" className="ml-2 animate-pulse">
-                    Patientez...
-                  </Badge>
-                )}
+                <FileDown className="h-4 w-4 mr-2" />
+                Export désactivé
+                <Badge variant="outline" className="ml-2">
+                  Indisponible
+                </Badge>
               </Button>
-              
-              {isExporting && (
-                <Progress value={exportProgress} className="h-2 w-full" />
-              )}
-              
-              {exportError && !isExporting && (
-                <div className="text-xs text-amber-700 mt-1">
-                  {exportError?.includes("being rebuilt") 
-                    ? "Cette fonctionnalité est en cours de refactorisation" 
-                    : `Erreur: ${exportError}`}
-                </div>
-              )}
+              <div className="text-xs text-amber-700 mt-1">
+                La fonctionnalité d'export a été désactivée
+              </div>
             </div>
           </TooltipTrigger>
           <TooltipContent side="top">
-            <p>
-              {!canExport
-                ? "Définissez les marqueurs de début et de fin"
-                : exportError?.includes("being rebuilt")
-                ? "La fonctionnalité d'export est en cours de reconstruction"
-                : "Découper et exporter la section audio sélectionnée (format MP3)"}
-            </p>
+            <p>La fonctionnalité d'export a été temporairement désactivée</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
