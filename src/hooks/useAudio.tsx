@@ -75,6 +75,8 @@ export const useAudio = () => {
       setMarkers([otherMarker]);
     }
     
+    // Important: Don't modify the audio position here
+    // Just add the marker at the current position
     const filteredMarkers = markers.filter(marker => marker.type !== type);
     
     const newMarker: AudioMarker = {
@@ -84,10 +86,7 @@ export const useAudio = () => {
     };
     
     setMarkers([...filteredMarkers, newMarker]);
-    
     toast.success(`Marqueur ${type === 'start' ? 'début' : 'fin'} défini à ${formatTime(currentTime)}`);
-    
-    // Don't perform any seek operations here - that's the key to fixing this issue
   };
   
   // Remove marker by ID
@@ -385,48 +384,37 @@ export const useAudio = () => {
       
       setExportProgress(70);
       
-      // Convert to MP3 using lamejs - FIX: Modified lamejs encoding approach
-      const sampleRate = renderedBuffer.sampleRate;
+      // Convert to MP3 using lamejs - Fixed approach to avoid MPEGMode issue
       const channels = renderedBuffer.numberOfChannels;
-      const bitRate = 192;
+      const sampleRate = renderedBuffer.sampleRate;
       
-      console.log(`Encoding with: channels=${channels}, sampleRate=${sampleRate}, bitRate=${bitRate}`);
-      
-      // Simplify the encoder creation to avoid the MPEGMode issue
-      const mp3encoder = new lamejs.Mp3Encoder(channels, sampleRate, bitRate);
+      // Create the MP3 encoder - IMPORTANT: don't use any MPEGMode parameters
+      const mp3encoder = new lamejs.Mp3Encoder(channels, sampleRate, 192);
       
       const mp3Data = [];
-      const sampleBlockSize = 1152;
+      const sampleBlockSize = 1152; // Must be 1152 for MP3
       
-      // Process left and right channels
       const left = renderedBuffer.getChannelData(0);
       const right = channels > 1 ? renderedBuffer.getChannelData(1) : renderedBuffer.getChannelData(0);
       
-      const samplesLength = renderedBuffer.length;
-      console.log(`Total samples to process: ${samplesLength}`);
+      const totalSamples = renderedBuffer.length;
+      console.log(`Total samples to process: ${totalSamples}`);
       
-      for (let i = 0; i < samplesLength; i += sampleBlockSize) {
-        // Update progress periodically
-        if (i % (sampleBlockSize * 10) === 0) {
-          const progress = 70 + Math.min(25, (i / samplesLength) * 25);
+      // Process the audio data in chunks
+      for (let i = 0; i < totalSamples; i += sampleBlockSize) {
+        if (i % (sampleBlockSize * 20) === 0) {
+          const progress = 70 + Math.min(25, (i / totalSamples) * 25);
           setExportProgress(progress);
         }
         
-        // Create sample blocks
         const leftChunk = new Int16Array(sampleBlockSize);
         const rightChunk = new Int16Array(sampleBlockSize);
         
-        // Fill chunks with audio data
         for (let j = 0; j < sampleBlockSize; j++) {
-          if (i + j < samplesLength) {
+          if (i + j < totalSamples) {
             // Convert float samples (-1.0 to 1.0) to int16 (-32768 to 32767)
-            leftChunk[j] = left[i + j] < 0 
-              ? Math.max(-32768, Math.floor(left[i + j] * 32768)) 
-              : Math.min(32767, Math.floor(left[i + j] * 32768));
-            
-            rightChunk[j] = right[i + j] < 0 
-              ? Math.max(-32768, Math.floor(right[i + j] * 32768)) 
-              : Math.min(32767, Math.floor(right[i + j] * 32768));
+            leftChunk[j] = Math.max(-32768, Math.min(32767, Math.round(left[i + j] * 32768)));
+            rightChunk[j] = Math.max(-32768, Math.min(32767, Math.round(right[i + j] * 32768)));
           } else {
             // Fill remaining samples with silence
             leftChunk[j] = 0;
@@ -434,40 +422,25 @@ export const useAudio = () => {
           }
         }
         
-        // Encode this chunk
         const mp3buf = mp3encoder.encodeBuffer(leftChunk, rightChunk);
         if (mp3buf.length > 0) {
-          mp3Data.push(new Uint8Array(mp3buf));
+          mp3Data.push(mp3buf);
         }
       }
       
-      // Get the final part of the MP3
+      // Finish encoding
       const mp3buf = mp3encoder.flush();
       if (mp3buf.length > 0) {
-        mp3Data.push(new Uint8Array(mp3buf));
+        mp3Data.push(mp3buf);
       }
       
       setExportProgress(95);
       
-      // Combine all chunks into one Uint8Array
-      let totalLength = 0;
-      for (let i = 0; i < mp3Data.length; i++) {
-        totalLength += mp3Data[i].length;
-      }
-      
-      const mp3Output = new Uint8Array(totalLength);
-      let offset = 0;
-      
-      for (let i = 0; i < mp3Data.length; i++) {
-        mp3Output.set(mp3Data[i], offset);
-        offset += mp3Data[i].length;
-      }
-      
-      // Create blob and download
-      const blob = new Blob([mp3Output], { type: 'audio/mp3' });
+      // Convert to a single Blob
+      const blob = new Blob(mp3Data, { type: 'audio/mp3' });
       const url = URL.createObjectURL(blob);
       
-      // Create and trigger download
+      // Trigger download
       const fileName = currentAudioFile 
         ? `${currentAudioFile.name.replace(/\.[^/.]+$/, '')}_trim.mp3`
         : `audio_trim_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.mp3`;
@@ -486,7 +459,6 @@ export const useAudio = () => {
         setExportProgress(100);
         toast.success("Export réussi");
         
-        // Reset export state after a moment
         setTimeout(() => {
           setIsExporting(false);
           setExportProgress(0);
