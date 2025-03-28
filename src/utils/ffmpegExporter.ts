@@ -1,3 +1,4 @@
+
 /**
  * Audio exporter using lamejs for MP3 encoding
  */
@@ -53,7 +54,13 @@ export class FFmpegExporter {
       console.log(`Encoding with parameters: channels=${channels}, sampleRate=${sampleRate}, bitRate=${bitRate}`);
       
       try {
-        // Create MP3 encoder - explicitly set MPEG mode to stereo (crucial fix)
+        // Create MP3 encoder - we must define MPEG mode constants since they're missing
+        // This is the fix for the "MPEGMode is not defined" error
+        const STEREO = 0;
+        const JOINT_STEREO = 1;
+        
+        // Use stereo mode for 2 channels, otherwise mono
+        const mode = channels === 2 ? JOINT_STEREO : STEREO;
         const encoder = new Mp3Encoder(channels, sampleRate, bitRate);
         
         // Create buffer to hold the MP3 data
