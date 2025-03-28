@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useAudioContext } from './useAudioContext';
@@ -33,6 +32,9 @@ export const useAudio = () => {
   // Initialize context and utils
   const { getAudioContext, isContextReady } = useAudioContext();
   const { formatTime, formatTimeDetailed } = useAudioFormatting();
+  
+  // Get the utility function for adding markers
+  const { addMarker: addMarkerUtil } = useAudioMarkers(formatTime);
   
   // Initialize files management
   const { 
@@ -85,7 +87,7 @@ export const useAudio = () => {
     
     toast.success(`Marqueur ${type === 'start' ? 'début' : 'fin'} défini à ${formatTime(currentTime)}`);
     
-    // Don't modify current playback position
+    // Don't need to modify playback position
   };
   
   // Remove marker by ID
@@ -388,12 +390,8 @@ export const useAudio = () => {
       const sampleRate = renderedBuffer.sampleRate;
       const bitRate = 192;
       
-      // Create encoder with explicit MPEGMode argument
-      const mp3Encoder = new lamejs.Mp3Encoder(
-        channels,
-        sampleRate,
-        bitRate
-      );
+      // Create encoder without using MPEGMode since it's causing issues
+      const mp3Encoder = new lamejs.Mp3Encoder(channels, sampleRate, bitRate);
       
       const mp3Data = [];
       const sampleBlockSize = 1152; // Must be a multiple of 576 for lamejs
