@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useAudioContext } from './useAudioContext';
@@ -203,7 +202,11 @@ export const useAudio = () => {
   };
   
   // Add marker at current time without moving playback position
-  const handleAddMarker = (type: 'start' | 'end', time: number) => {
+  const handleAddMarker = (type: 'start' | 'end') => {
+    // Store current playback state and position
+    const wasPlaying = isPlaying;
+    const currentPosition = currentTime;
+    
     // If we don't have any markers yet and the user adds a marker,
     // let's automatically add the other one at the appropriate position
     if (markers.length === 0) {
@@ -219,11 +222,11 @@ export const useAudio = () => {
       setMarkers([otherMarker]);
     }
     
-    // Add the marker at the specified time without changing playback position
-    addMarker(type, time);
+    // Add the marker at the current time without changing playback position
+    addMarker(type, currentPosition);
     
     // Don't change the current playback position or state
-    toast.success(`Marqueur ${type === 'start' ? 'début' : 'fin'} défini à ${formatTime(time)}`);
+    toast.success(`Marqueur ${type === 'start' ? 'début' : 'fin'} défini à ${formatTime(currentPosition)}`);
   };
   
   // Update time display from audio element
@@ -283,7 +286,7 @@ export const useAudio = () => {
     };
   }, []);
 
-  // Export trimmed audio using the original file format
+  // Export trimmed audio using the original file format - optimized version
   const exportTrimmedAudio = async () => {
     const startMarker = markers.find(marker => marker.type === 'start');
     const endMarker = markers.find(marker => marker.type === 'end');
@@ -304,87 +307,43 @@ export const useAudio = () => {
     }
     
     setIsExporting(true);
-    setExportProgress(0);
+    setExportProgress(5);
     setExportError(null);
     
     try {
-      const ctx = getAudioContext();
-      if (!ctx) {
-        throw new Error("Impossible d'accéder au contexte audio");
+      // Get audio data from the current source
+      const audioElement = audioRef.current;
+      if (!audioElement || !audioElement.src) {
+        throw new Error("Source audio non disponible");
       }
       
       const startTime = startMarker.position;
       const endTime = endMarker.position;
       const duration = endTime - startTime;
       
-      // Create offline audio context for processing
-      const offlineCtx = new OfflineAudioContext(
-        2, // stereo
-        Math.ceil(duration * ctx.sampleRate),
-        ctx.sampleRate
-      );
-      
-      // Get audio data - either from audio element or from existing buffer
-      let sourceBuffer: AudioBuffer;
-      
-      if (audioBuffer) {
-        // Use existing buffer
-        sourceBuffer = audioBuffer;
-      } else {
-        // Need to fetch and decode the audio
-        const audioElement = audioRef.current;
-        if (!audioElement || !audioElement.src) {
-          throw new Error("Source audio non disponible");
-        }
-        
-        setExportProgress(5);
-        
-        // Fetch the audio file
-        const response = await fetch(audioElement.src);
-        const arrayBuffer = await response.arrayBuffer();
-        
-        setExportProgress(20);
-        
-        // Decode the audio data
-        sourceBuffer = await ctx.decodeAudioData(arrayBuffer);
-        setExportProgress(40);
-      }
-      
-      // Create buffer source
-      const source = offlineCtx.createBufferSource();
-      source.buffer = sourceBuffer;
-      
-      // Connect source to offline context
-      source.connect(offlineCtx.destination);
-      
-      // Start the source at the appropriate offset
-      source.start(0, startTime, duration);
-      
-      setExportProgress(50);
-      
-      // Render the audio
-      const renderedBuffer = await offlineCtx.startRendering();
-      
-      setExportProgress(70);
-      
       // Determine file type from original source
       const originalFileType = currentAudioFile ? 
-        (currentAudioFile.name.toLowerCase().endsWith('.wav') ? 'audio/wav' : 'audio/mp3') : 
-        'audio/mp3';
+        (currentAudioFile.name.toLowerCase().endsWith('.wav') ? 'audio/wav' : 'audio/mpeg') : 
+        'audio/mpeg';
       
-      // Create a media stream source
-      const audioCtx = new AudioContext();
-      const mediaStreamDest = audioCtx.createMediaStreamDestination();
-      const sourceNode = audioCtx.createBufferSource();
-      sourceNode.buffer = renderedBuffer;
-      sourceNode.connect(mediaStreamDest);
+      // Create a temporary audio element for the source
+      const tempAudio = new Audio(audioElement.src);
+      tempAudio.crossOrigin = "anonymous";
       
-      // Create a media recorder to capture the stream
+      // Set up audio processing
+      const ctx = new AudioContext();
+      const source = ctx.createMediaElementSource(tempAudio);
+      const destination = ctx.createMediaStreamDestination();
+      source.connect(destination);
+      
+      setExportProgress(20);
+      
+      // Create MediaRecorder with proper mime type
       const mimeType = originalFileType === 'audio/wav' ? 
         (MediaRecorder.isTypeSupported('audio/wav') ? 'audio/wav' : 'audio/webm') : 
-        (MediaRecorder.isTypeSupported('audio/mp3') ? 'audio/mp3' : 'audio/webm');
+        (MediaRecorder.isTypeSupported('audio/mpeg') ? 'audio/mpeg' : 'audio/webm');
       
-      const mediaRecorder = new MediaRecorder(mediaStreamDest.stream, {
+      const mediaRecorder = new MediaRecorder(destination.stream, {
         mimeType: MediaRecorder.isTypeSupported(mimeType) ? mimeType : 'audio/webm'
       });
       
@@ -422,6 +381,7 @@ export const useAudio = () => {
         setTimeout(() => {
           document.body.removeChild(a);
           URL.revokeObjectURL(url);
+          ctx.close();
           setExportProgress(100);
           toast.success("Export réussi");
           
@@ -432,18 +392,27 @@ export const useAudio = () => {
         }, 100);
       };
       
-      // Start recording and then stop immediately after source has played
+      // Start recording
       mediaRecorder.start();
-      sourceNode.start(0);
+      setExportProgress(30);
       
-      // Stop after duration
-      setTimeout(() => {
-        sourceNode.stop();
-        mediaRecorder.stop();
-        audioCtx.close();
-      }, duration * 1000 + 100);
+      // Set the position and play just the part we want to export
+      tempAudio.currentTime = startTime;
+      setExportProgress(40);
       
-      setExportProgress(80);
+      tempAudio.play().then(() => {
+        setExportProgress(50);
+        
+        // Stop after duration
+        setTimeout(() => {
+          tempAudio.pause();
+          mediaRecorder.stop();
+          setExportProgress(70);
+        }, duration * 1000);
+      }).catch(playError => {
+        console.error("Error playing audio for export:", playError);
+        throw new Error("Erreur lors de la lecture pour l'export");
+      });
       
     } catch (error) {
       console.error("Error exporting audio:", error);
