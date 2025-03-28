@@ -6,6 +6,7 @@ import { LocalAudioLoader } from "@/components/LocalAudioLoader";
 import { useAudio } from "@/hooks/useAudio";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSettings } from "@/contexts/SettingsContext";
+import { MarkerControls } from "@/components/MarkerControls";
 
 const Index = () => {
   const { settings } = useSettings();
@@ -16,6 +17,7 @@ const Index = () => {
     loadAudioFile,
     loadFilesFromUNC,
     formatTime,
+    formatTimeDetailed,
     isPlaying,
     currentTime,
     duration,
@@ -24,11 +26,21 @@ const Index = () => {
     seek,
     changeVolume,
     currentAudioFile,
-    isBuffering
+    isBuffering,
+    markers,
+    addMarker,
+    showMarkerControls,
+    setShowMarkerControls,
+    exportTrimmedAudio,
+    isExporting,
+    exportProgress,
+    exportError
   } = useAudio();
 
   const handleFileSelect = (file) => {
     loadAudioFile(file);
+    // Show marker controls when a file is loaded
+    setShowMarkerControls(true);
   };
 
   const handleSearch = (path, city, date, hour) => {
@@ -82,20 +94,37 @@ const Index = () => {
         </div>
 
         <div className="md:col-span-2 lg:col-span-3 flex flex-col space-y-4 h-full overflow-hidden">
-          <div className="flex-1 min-h-0">
-            <AudioPlayer
-              isPlaying={isPlaying}
-              currentTime={currentTime}
-              duration={duration}
-              volume={volume}
-              onPlayPause={togglePlay}
-              onVolumeChange={changeVolume}
-              onSeek={seek}
-              formatTime={formatTime}
-              audioTitle={currentAudioFile ? currentAudioFile.name : "No audio loaded"}
-              isLoading={isLoading}
-              isBuffering={isBuffering}
-            />
+          <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="lg:col-span-2">
+              <AudioPlayer
+                isPlaying={isPlaying}
+                currentTime={currentTime}
+                duration={duration}
+                volume={volume}
+                onPlayPause={togglePlay}
+                onVolumeChange={changeVolume}
+                onSeek={seek}
+                formatTime={formatTime}
+                audioTitle={currentAudioFile ? currentAudioFile.name : "No audio loaded"}
+                isLoading={isLoading}
+                isBuffering={isBuffering}
+              />
+            </div>
+            
+            {currentAudioFile && (
+              <div className="lg:col-span-1">
+                <MarkerControls
+                  markers={markers}
+                  onAddMarker={addMarker}
+                  onExport={exportTrimmedAudio}
+                  currentTime={currentTime}
+                  formatTimeDetailed={formatTimeDetailed}
+                  isExporting={isExporting}
+                  exportProgress={exportProgress}
+                  exportError={exportError}
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>
