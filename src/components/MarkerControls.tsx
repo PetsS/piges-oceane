@@ -18,8 +18,6 @@ interface MarkerControlsProps {
   currentTime: number;
   formatTimeDetailed: (time: number) => string;
   isExporting?: boolean;
-  exportProgress?: number;
-  exportError?: string | null;
 }
 
 export const MarkerControls = ({
@@ -29,8 +27,6 @@ export const MarkerControls = ({
   currentTime,
   formatTimeDetailed,
   isExporting = false,
-  exportProgress = 0,
-  exportError = null,
 }: MarkerControlsProps) => {
   const startMarker = markers.find((marker) => marker.type === "start");
   const endMarker = markers.find((marker) => marker.type === "end");
@@ -137,8 +133,6 @@ export const MarkerControls = ({
           isExporting={isExporting}
           formatTimeDetailed={formatTimeDetailed}
           canExport={canExport}
-          exportProgress={exportProgress}
-          exportError={exportError}
         />
       </div>
     </div>

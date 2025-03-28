@@ -1,18 +1,25 @@
-
 import { useState } from "react";
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { FileBrowser } from "@/components/FileBrowser";
+import { MarkerControls } from "@/components/MarkerControls";
 import { LocalAudioLoader } from "@/components/LocalAudioLoader";
 import { useAudio } from "@/hooks/useAudio";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Headphones } from "lucide-react";
 import { useSettings } from "@/contexts/SettingsContext";
+import { Button } from "@/components/ui/button";
 
 const Index = () => {
+  const [isExporting, setIsExporting] = useState(false);
   const { settings } = useSettings();
   
   const {
     audioFiles,
     isLoading,
+    markers,
+    addMarker,
+    removeMarker,
+    exportTrimmedAudio,
     loadAudioFile,
     loadFilesFromUNC,
     formatTime,
@@ -26,19 +33,33 @@ const Index = () => {
     changeVolume,
     currentAudioFile,
     isBuffering,
-    markers,
-    addMarker,
-    exportTrimmedAudio,
-    isExporting,
-    exportProgress
+    showMarkerControls,
+    setShowMarkerControls
   } = useAudio();
 
   const handleFileSelect = (file) => {
+    setShowMarkerControls(false);
     loadAudioFile(file);
   };
 
   const handleSearch = (path, city, date, hour) => {
+    setShowMarkerControls(false);
     loadFilesFromUNC(path, city, date, hour);
+  };
+
+  const handleExport = async () => {
+    try {
+      setIsExporting(true);
+      console.log("Starting export process");
+      await exportTrimmedAudio();
+    } catch (error) {
+      console.error("Export error:", error);
+    } finally {
+      setTimeout(() => {
+        setIsExporting(false);
+        console.log("Export process completed");
+      }, 500);
+    }
   };
 
   if (!settings) {
@@ -98,16 +119,35 @@ const Index = () => {
               onVolumeChange={changeVolume}
               onSeek={seek}
               formatTime={formatTime}
-              formatTimeDetailed={formatTimeDetailed}
               audioTitle={currentAudioFile ? currentAudioFile.name : "No audio loaded"}
               isLoading={isLoading}
               isBuffering={isBuffering}
-              markers={markers}
-              onAddMarker={addMarker}
-              onExport={exportTrimmedAudio}
-              isExporting={isExporting}
-              exportProgress={exportProgress}
             />
+          </div>
+
+          <div className="h-fit">
+            {currentAudioFile && !showMarkerControls && (
+              <div className="flex justify-end mb-4">
+                <Button 
+                  onClick={() => setShowMarkerControls(true)}
+                  className="animate-fade-in"
+                >
+                  <Headphones className="h-4 w-4 mr-2" />
+                  Edit audio
+                </Button>
+              </div>
+            )}
+            
+            {showMarkerControls && (
+              <MarkerControls
+                markers={markers}
+                onAddMarker={addMarker}
+                onExport={handleExport}
+                currentTime={currentTime}
+                formatTimeDetailed={formatTimeDetailed}
+                isExporting={isExporting}
+              />
+            )}
           </div>
         </div>
       </div>
