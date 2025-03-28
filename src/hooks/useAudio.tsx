@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useAudioContext } from './useAudioContext';
@@ -6,7 +7,6 @@ import { useAudioPlayback } from './useAudioPlayback';
 import { useAudioFiles } from './useAudioFiles';
 import { useAudioMarkers } from './useAudioMarkers';
 import { AudioMarker, AudioFile } from './useAudioTypes';
-import * as lamejs from 'lamejs';
 
 export type { AudioMarker, AudioFile };
 
@@ -221,6 +221,9 @@ export const useAudio = () => {
     
     // Add the marker at the specified time without changing playback position
     addMarker(type, time);
+    
+    // Don't change the current playback position or state
+    toast.success(`Marqueur ${type === 'start' ? 'début' : 'fin'} défini à ${formatTime(time)}`);
   };
   
   // Update time display from audio element
@@ -376,9 +379,13 @@ export const useAudio = () => {
       sourceNode.buffer = renderedBuffer;
       sourceNode.connect(mediaStreamDest);
       
-      // Create a media recorder to capture the stream with the appropriate format
+      // Create a media recorder to capture the stream
+      const mimeType = originalFileType === 'audio/wav' ? 
+        (MediaRecorder.isTypeSupported('audio/wav') ? 'audio/wav' : 'audio/webm') : 
+        (MediaRecorder.isTypeSupported('audio/mp3') ? 'audio/mp3' : 'audio/webm');
+      
       const mediaRecorder = new MediaRecorder(mediaStreamDest.stream, {
-        mimeType: MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg'
+        mimeType: MediaRecorder.isTypeSupported(mimeType) ? mimeType : 'audio/webm'
       });
       
       const chunks: Blob[] = [];

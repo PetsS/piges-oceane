@@ -24,13 +24,19 @@ export const useAudioMarkers = (formatTime: (time: number) => string) => {
   }, []);
   
   const initializeMarkers = useCallback((duration: number) => {
-    const startMarkerId = `start-${Date.now()}`;
-    const endMarkerId = `end-${Date.now() + 1}`;
-    
-    setMarkers([
-      { id: startMarkerId, position: 0, type: 'start' },
-      { id: endMarkerId, position: duration, type: 'end' }
-    ]);
+    // Only initialize markers if there are none already set
+    setMarkers(prevMarkers => {
+      if (prevMarkers.length === 0) {
+        const startMarkerId = `start-${Date.now()}`;
+        const endMarkerId = `end-${Date.now() + 1}`;
+        
+        return [
+          { id: startMarkerId, position: 0, type: 'start' },
+          { id: endMarkerId, position: duration, type: 'end' }
+        ];
+      }
+      return prevMarkers;
+    });
   }, []);
 
   return {
