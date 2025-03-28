@@ -10,6 +10,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Progress } from "@/components/ui/progress";
+import { useState, useEffect } from "react";
 
 interface AudioExporterProps {
   markers: AudioMarker[];
@@ -32,6 +33,24 @@ export const AudioExporter = ({
 }: AudioExporterProps) => {
   const startMarker = markers.find((marker) => marker.type === "start");
   const endMarker = markers.find((marker) => marker.type === "end");
+  
+  // Add a display message for the export process
+  const [exportMessage, setExportMessage] = useState("Export en cours...");
+  
+  // Update the export message based on progress
+  useEffect(() => {
+    if (isExporting) {
+      if (exportProgress < 20) {
+        setExportMessage("Préparation de l'export...");
+      } else if (exportProgress < 50) {
+        setExportMessage("Traitement audio...");
+      } else if (exportProgress < 90) {
+        setExportMessage("Finalisation...");
+      } else {
+        setExportMessage("Téléchargement...");
+      }
+    }
+  }, [exportProgress, isExporting]);
 
   return (
     <div className="space-y-3">
@@ -65,7 +84,7 @@ export const AudioExporter = ({
                 {isExporting ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Export en cours...
+                    {exportMessage}
                   </>
                 ) : (
                   <>
