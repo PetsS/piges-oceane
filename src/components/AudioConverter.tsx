@@ -1,9 +1,11 @@
+
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Upload, FileAudio2, Download } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import lamejs from "lamejs";
 
 export const AudioConverter = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -81,17 +83,76 @@ export const AudioConverter = () => {
       
       setProgress(60);
       
-      // Create a WAV file instead of MP3 due to lamejs compatibility issues
-      const wav = createWaveFileData(audioBuffer);
+      // Create MP3 encoder using lamejs
+      const mp3encoder = new lamejs.Mp3Encoder(channels, sampleRate, 192);
+      const mp3Data = [];
       
-      setProgress(80);
+      const sampleBlockSize = 1152; // A good sample block size for MP3 encoding
+      
+      // Process the audio data in chunks to avoid memory issues
+      for (let i = 0; i < left.length; i += sampleBlockSize) {
+        const leftChunk = new Int16Array(sampleBlockSize);
+        const rightChunk = new Int16Array(sampleBlockSize);
+        
+        // Convert float32 to int16
+        for (let j = 0; j < sampleBlockSize; j++) {
+          if (i + j < left.length) {
+            // Convert float [-1.0..1.0] to int [-32768..32767]
+            leftChunk[j] = left[i + j] < 0 ? 
+                            left[i + j] * 0x8000 : 
+                            left[i + j] * 0x7FFF;
+            rightChunk[j] = right[i + j] < 0 ? 
+                             right[i + j] * 0x8000 : 
+                             right[i + j] * 0x7FFF;
+          }
+        }
+        
+        let mp3buf;
+        if (channels === 1) {
+          mp3buf = mp3encoder.encodeBuffer(leftChunk);
+        } else {
+          mp3buf = mp3encoder.encodeBuffer(leftChunk, rightChunk);
+        }
+        
+        if (mp3buf.length > 0) {
+          mp3Data.push(mp3buf);
+        }
+        
+        // Update progress during encoding
+        if (i % (sampleBlockSize * 10) === 0) {
+          const progressValue = 60 + (i / left.length) * 30;
+          setProgress(Math.min(90, progressValue));
+        }
+      }
+      
+      // Get final mp3 data
+      const mp3buf = mp3encoder.flush();
+      if (mp3buf.length > 0) {
+        mp3Data.push(mp3buf);
+      }
+      
+      setProgress(95);
+      
+      // Convert mp3Data to a single Uint8Array
+      let totalLength = 0;
+      for (let i = 0; i < mp3Data.length; i++) {
+        totalLength += mp3Data[i].length;
+      }
+      
+      const mp3Output = new Uint8Array(totalLength);
+      let offset = 0;
+      
+      for (let i = 0; i < mp3Data.length; i++) {
+        mp3Output.set(mp3Data[i], offset);
+        offset += mp3Data[i].length;
+      }
       
       // Create blob and download
-      const blob = new Blob([wav], { type: 'audio/wav' });
+      const blob = new Blob([mp3Output], { type: 'audio/mp3' });
       const url = URL.createObjectURL(blob);
       
-      // Create filename (keeping .wav extension since we're saving as WAV)
-      const outputFileName = selectedFile.name.replace(/\.wav$/i, '_converted.wav');
+      // Create filename
+      const outputFileName = selectedFile.name.replace(/\.wav$/i, '.mp3');
       
       // Trigger download
       const downloadLink = document.createElement('a');
@@ -118,61 +179,6 @@ export const AudioConverter = () => {
         setIsConverting(false);
         setProgress(0);
       }, 1500);
-    }
-  };
-  
-  // Function to create WAV file from AudioBuffer
-  const createWaveFileData = (audioBuffer: AudioBuffer): ArrayBuffer => {
-    const numOfChannels = audioBuffer.numberOfChannels;
-    const length = audioBuffer.length * numOfChannels * 2 + 44;
-    const buffer = new ArrayBuffer(length);
-    const view = new DataView(buffer);
-    const channels = [];
-    
-    // Get audio channels data
-    for (let i = 0; i < numOfChannels; i++) {
-      channels.push(audioBuffer.getChannelData(i));
-    }
-    
-    // WAV header
-    // RIFF chunk descriptor
-    writeString(view, 0, 'RIFF');
-    view.setUint32(4, length - 8, true);
-    writeString(view, 8, 'WAVE');
-    
-    // FMT sub-chunk
-    writeString(view, 12, 'fmt ');
-    view.setUint32(16, 16, true); // subchunk size
-    view.setUint16(20, 1, true); // PCM format
-    view.setUint16(22, numOfChannels, true); // num of channels
-    view.setUint32(24, audioBuffer.sampleRate, true); // sample rate
-    view.setUint32(28, audioBuffer.sampleRate * numOfChannels * 2, true); // byte rate
-    view.setUint16(32, numOfChannels * 2, true); // block align
-    view.setUint16(34, 16, true); // bits per sample
-    
-    // Data sub-chunk
-    writeString(view, 36, 'data');
-    view.setUint32(40, length - 44, true);
-    
-    // Write audio data
-    const volume = 1;
-    let index = 44;
-    
-    for (let i = 0; i < audioBuffer.length; i++) {
-      for (let channel = 0; channel < numOfChannels; channel++) {
-        const sample = Math.max(-1, Math.min(1, channels[channel][i]));
-        const val = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
-        view.setInt16(index, val, true);
-        index += 2;
-      }
-    }
-    
-    return buffer;
-  };
-  
-  const writeString = (view: DataView, offset: number, string: string) => {
-    for (let i = 0; i < string.length; i++) {
-      view.setUint8(offset + i, string.charCodeAt(i));
     }
   };
   
@@ -220,7 +226,7 @@ export const AudioConverter = () => {
                 className="transition-all duration-300 hover:shadow-md hover:translate-y-[-1px]"
               >
                 <Download className="h-4 w-4 mr-2" />
-                {isConverting ? "Conversion..." : "Convertir"}
+                {isConverting ? "Conversion..." : "Convertir en MP3"}
               </Button>
             </div>
           </div>
@@ -231,7 +237,7 @@ export const AudioConverter = () => {
               Glissez un fichier WAV ou cliquez pour parcourir
             </h4>
             <p className="text-xs text-muted-foreground mt-1">
-              Uniquement les fichiers WAV sont supportés
+              Uniquement les fichiers WAV sont supportés pour la conversion MP3
             </p>
           </>
         )}
@@ -253,9 +259,10 @@ export const AudioConverter = () => {
       
       <div className="text-xs text-muted-foreground mt-4 p-3 bg-muted/50 rounded-md">
         <p>
-          <strong>Comment utiliser:</strong> Sélectionnez un fichier WAV, puis cliquez sur "Convertir" pour le télécharger au format optimisé.
+          <strong>Comment utiliser:</strong> Sélectionnez un fichier WAV, puis cliquez sur "Convertir en MP3" pour le télécharger au format MP3.
         </p>
       </div>
     </div>
   );
 };
+
