@@ -36,12 +36,16 @@ export const useAudioFiles = (
     
     setAudioBuffer(null);
     
-    if (file.path.startsWith('blob:') || file.path.startsWith('http')) {
+    if (file.path.startsWith('/') || file.path.startsWith('blob:') || file.path.startsWith('http')) {
       console.log("Loading large local file:", file.name, file.path);
+
+      const normalizedPath = encodeURI(file.path.replace(/\\/g, '/'));
+      console.log("Normalized path:", normalizedPath);
       
       const audio = new Audio();
       audio.preload = "metadata";
-      audio.src = file.path;
+      // audio.src = file.path;
+      audio.src = normalizedPath;
       
       audio.addEventListener('loadedmetadata', () => {
         console.log("Audio metadata loaded:", file.name, "Duration:", audio.duration);
@@ -173,7 +177,8 @@ export const useAudioFiles = (
     const audioFolderPath = settings.audioFolderPath || '\\\\server\\audioLogs';
     
     // Default type (departs)
-    const defaultType = 'departs';
+    // const defaultType = 'departs';
+    const defaultType = 'Départs';
     
     loadFilesFromUNC(
       `${audioFolderPath}\\${defaultType}\\${defaultCity}\\${format(today, 'yyyy-MM-dd')}\\${prevHourString}.mp3`, 
