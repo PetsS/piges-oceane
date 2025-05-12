@@ -38,9 +38,11 @@ export const FileBrowser = ({
 }: FileBrowserProps) => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedHour, setSelectedHour] = useState<string | null>(null);
-  const [audioFolderPath, setAudioFolderPath] = useState("\\\\server\\audioLogs");
+  // const [audioFolderPath, setAudioFolderPath] = useState("\\\\server\\audioLogs");
+  const [audioFolderPath, setAudioFolderPath] = useState("/audio");
   const [selectedCityFolder, setSelectedCityFolder] = useState<string>(citiesConfig[0]?.folderName || "01_Brest");
-  const [selectedType, setSelectedType] = useState<string>(typesConfig[0]?.folderName || "departs");
+  // const [selectedType, setSelectedType] = useState<string>(typesConfig[0]?.folderName || "departs");
+  const [selectedType, setSelectedType] = useState<string>(typesConfig[0]?.folderName || "Départs");
   const [cities, setCities] = useState<CityFolder[]>(citiesConfig);
   const [types, setTypes] = useState(typesConfig);
   const [isLocalPath, setIsLocalPath] = useState(false);
@@ -83,7 +85,7 @@ export const FileBrowser = ({
     
     if (isLocalPath) {
       // For local paths, construct the path without doubling the backslashes
-      fullPath = `${audioFolderPath}\\${selectedType}\\${selectedCityFolder}\\${dateFolder}${selectedHour ? `\\${selectedHour}.mp3` : ''}`;
+      fullPath = `${audioFolderPath}/${selectedType}/${selectedCityFolder}/${dateFolder}${selectedHour ? `/${selectedHour}.mp3` : ''}`;
     } else {
       // For network paths (UNC), ensure the format starts with double backslashes
       fullPath = `${audioFolderPath}\\${selectedType}\\${selectedCityFolder}\\${dateFolder}${selectedHour ? `\\${selectedHour}.mp3` : ''}`;
