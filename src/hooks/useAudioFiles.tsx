@@ -42,32 +42,40 @@ export const useAudioFiles = (
       const normalizedPath = encodeURI(file.path.replace(/\\/g, '/'));
       console.log("Normalized path:", normalizedPath);
       
-      const audio = new Audio();
-      audio.preload = "metadata";
-      // audio.src = file.path;
-      audio.src = normalizedPath;
-      
-      audio.addEventListener('loadedmetadata', () => {
-        console.log("Audio metadata loaded:", file.name, "Duration:", audio.duration);
-        setAudioSrc(file.path);
-        setIsPlaying(false);
-        setCurrentTime(0);
-        setIsLoading(false);
-        
-        if (audio.duration) {
-          initializeMarkers(audio.duration);
-        }
-        
-        toast.success(`Audio file loaded: ${file.name}`);
-      }, { once: true });
-      
-      audio.addEventListener('error', (e) => {
-        console.error("Error loading audio file:", e);
-        toast.error(`Couldn't load audio file: ${file.name}`);
-        setIsLoading(false);
-      }, { once: true });
-      
-      audio.load();
+      if (audioRef.current) {
+        const audio = audioRef.current;
+
+        audio.removeAttribute('src');
+        audio.load();
+  
+        audio.src = normalizedPath;
+        audio.preload = "metadata";
+  
+        const onLoadedMetadata = () => {
+          console.log("Audio metadata loaded:", file.name, "Duration:", audio.duration);
+          setAudioSrc(normalizedPath);
+          setIsPlaying(false);
+          setCurrentTime(0);
+          setIsLoading(false);
+  
+          if (audio.duration) {
+            initializeMarkers(audio.duration);
+          }
+  
+          toast.success(`Audio file loaded: ${file.name}`);
+        };
+  
+        const onError = (e: any) => {
+          console.error("Error loading audio file:", e);
+          toast.error(`Couldn't load audio file: ${file.name}`);
+          setIsLoading(false);
+        };
+  
+        audio.addEventListener('loadedmetadata', onLoadedMetadata, { once: true });
+        audio.addEventListener('error', onError, { once: true });
+  
+        audio.load();
+      }
     } else {
       console.log("Loading mock network file:", file.name);
       setTimeout(() => {
@@ -96,7 +104,7 @@ export const useAudioFiles = (
             
             setAudioBuffer(buffer);
             
-            toast.info("Fichier audio réseau simulé chargé avec succès.");
+            toast.info("Simulated network audio loaded.");
             return;
           }
         } catch (error) {
