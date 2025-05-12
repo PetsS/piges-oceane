@@ -29,7 +29,8 @@ const defaultSettings: Settings = {
   logoUrl: null,
   enableNotifications: true,
   cities: citiesConfig,
-  audioFolderPath: '\\\\server\\audioLogs',
+  // audioFolderPath: '\\\\server\\audioLogs',
+  audioFolderPath: '/audio',
   buttonColors: {
     primary: '#1F4A4F',
     secondary: '#8F8F8F',
