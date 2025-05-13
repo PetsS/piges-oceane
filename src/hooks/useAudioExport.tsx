@@ -30,17 +30,6 @@ export const useAudioExport = (
     const sampleRate = buffer.sampleRate;
     const numChannels = buffer.numberOfChannels;
     const mp3Encoder = new Mp3Encoder(numChannels, sampleRate, 128);
-
-    // Quick patch for MPEGMode if undefined
-    // if (typeof (window as any).MPEGMode === 'undefined') {
-    //   (window as any).MPEGMode = {
-    //     STEREO: 0,
-    //     JOINT_STEREO: 1,
-    //     DUAL_CHANNEL: 2,
-    //     MONO: 3
-    //   };
-    // }
-
     const samplesLeft = buffer.getChannelData(0);
     const samplesRight = numChannels > 1 ? buffer.getChannelData(1) : samplesLeft;
     const mp3Data: Uint8Array[] = [];
