@@ -130,6 +130,7 @@ export const useAudio = () => {
     loadAudioFile,
     loadFilesFromUNC,
     formatTime,
-    formatTimeDetailed
+    formatTimeDetailed,
+    audioRef
   };
 };
