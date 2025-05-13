@@ -147,8 +147,9 @@ export const useAudioControls = ({
   
   // Update time display from audio element
   useEffect(() => {
+    if (!audioRef.current) return;
+
     const audio = audioRef.current;
-    if (!audio) return;
     
     const timeUpdateHandler = () => {
       setCurrentTime(audio.currentTime);
@@ -200,7 +201,8 @@ export const useAudioControls = ({
       audio.removeEventListener('ended', endedHandler);
       audio.removeEventListener('error', errorHandler);
     };
-  }, [audioRef, setCurrentTime, setDuration, setIsPlaying, setIsBuffering]);
+  // }, [audioRef, setCurrentTime, setDuration, setIsPlaying, setIsBuffering]);
+  }, [audioRef.current]);
   
   return {
     addMarker,
