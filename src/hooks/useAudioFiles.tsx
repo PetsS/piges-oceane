@@ -23,97 +23,103 @@ export const useAudioFiles = (
   
   const loadAudioFileRef = useRef<(file: AudioFile) => void>();
 
-  const loadAudioFile = useCallback((file: AudioFile) => {
-    setIsLoading(true);
-    setCurrentAudioFile(file);
-    
-    if (audioRef.current) {
-      audioRef.current.pause();
-      if (audioSrc && audioSrc.startsWith('blob:')) {
-        URL.revokeObjectURL(audioSrc);
-      }
-    }
-    
-    setAudioBuffer(null);
-    
-    if (file.path.startsWith('/') || file.path.startsWith('blob:') || file.path.startsWith('http')) {
-      console.log("Loading large local file:", file.name, file.path);
-
-      const normalizedPath = encodeURI(file.path.replace(/\\/g, '/'));
-      console.log("Normalized path:", normalizedPath);
+  const loadAudioFile = useCallback((file: AudioFile): Promise<void> =>{
+    return new Promise((resolve, reject) => {
+      setIsLoading(true);
+      setCurrentAudioFile(file);
       
       if (audioRef.current) {
-        const audio = audioRef.current;
-
-        audio.removeAttribute('src');
-        audio.load();
-  
-        audio.src = normalizedPath;
-        audio.preload = "metadata";
-  
-        const onLoadedMetadata = () => {
-          console.log("Audio metadata loaded:", file.name, "Duration:", audio.duration);
-          setAudioSrc(normalizedPath);
-          setIsPlaying(false);
-          setCurrentTime(0);
-          setIsLoading(false);
-  
-          if (audio.duration) {
-            initializeMarkers(audio.duration);
-          }
-  
-          toast.success(`Audio file loaded: ${file.name}`);
-        };
-  
-        const onError = (e: any) => {
-          console.error("Error loading audio file:", e);
-          toast.error(`Couldn't load audio file: ${file.name}`);
-          setIsLoading(false);
-        };
-  
-        audio.addEventListener('loadedmetadata', onLoadedMetadata, { once: true });
-        audio.addEventListener('error', onError, { once: true });
-  
-        audio.load();
+        audioRef.current.pause();
+        if (audioSrc && audioSrc.startsWith('blob:')) {
+          URL.revokeObjectURL(audioSrc);
+        }
       }
-    } else {
-      console.log("Loading mock network file:", file.name);
-      setTimeout(() => {
-        try {
-          console.log("Creating synthetic audio for network file");
-          const ctx = getAudioContext();
-          if (ctx) {
-            setAudioSrc('synthetic-audio');
+      
+      setAudioBuffer(null);
+      
+      if (file.path.startsWith('/') || file.path.startsWith('blob:') || file.path.startsWith('http')) {
+        console.log("Loading large local file:", file.name, file.path);
+
+        const normalizedPath = encodeURI(file.path.replace(/\\/g, '/'));
+        console.log("Normalized path:", normalizedPath);
+        
+        if (audioRef.current) {
+          const audio = audioRef.current;
+
+          audio.removeAttribute('src');
+          audio.load();
+    
+          audio.src = normalizedPath;
+          audio.preload = "metadata";
+    
+          const onLoadedMetadata = () => {
+            console.log("Audio metadata loaded:", file.name, "Duration:", audio.duration);
+            setAudioSrc(normalizedPath);
             setIsPlaying(false);
             setCurrentTime(0);
             setIsLoading(false);
-            
-            const duration = 3600;
-            
-            initializeMarkers(duration);
-            
-            const buffer = ctx.createBuffer(2, Math.min(duration * ctx.sampleRate, 10 * ctx.sampleRate), ctx.sampleRate);
-            
-            for (let channel = 0; channel < 2; channel++) {
-              const data = buffer.getChannelData(channel);
-              const sampleLength = Math.min(data.length, 10 * ctx.sampleRate);
-              for (let i = 0; i < sampleLength; i++) {
-                data[i] = Math.sin(i * 0.01 * (1 + Math.sin(i * 0.0001) * 0.5)) * 0.5;
-              }
+    
+            if (audio.duration) {
+              initializeMarkers(audio.duration);
             }
-            
-            setAudioBuffer(buffer);
-            
-            toast.info("Simulated network audio loaded.");
-            return;
-          }
-        } catch (error) {
-          console.error("Error creating synthetic audio:", error);
+    
+            toast.success(`Audio file loaded: ${file.name}`);
+            resolve();
+          };
+    
+          const onError = (e: any) => {
+            console.error("Error loading audio file:", e);
+            toast.error(`Couldn't load audio file: ${file.name}`);
+            setIsLoading(false);
+            reject(e);
+          };
+    
+          audio.addEventListener('loadedmetadata', onLoadedMetadata, { once: true });
+          audio.addEventListener('error', onError, { once: true });
+    
+          audio.load();
         }
-        
-        toast.info("Remarque: L'accès aux fichiers réseau est simulé. Un fichier de test est disponible.");
-      }, 1000);
-    }
+      } else {
+        console.log("Loading mock network file:", file.name);
+        setTimeout(() => {
+          try {
+            console.log("Creating synthetic audio for network file");
+            const ctx = getAudioContext();
+            if (ctx) {
+              setAudioSrc('synthetic-audio');
+              setIsPlaying(false);
+              setCurrentTime(0);
+              setIsLoading(false);
+              
+              const duration = 3600;
+              
+              initializeMarkers(duration);
+              
+              const buffer = ctx.createBuffer(2, Math.min(duration * ctx.sampleRate, 10 * ctx.sampleRate), ctx.sampleRate);
+              
+              for (let channel = 0; channel < 2; channel++) {
+                const data = buffer.getChannelData(channel);
+                const sampleLength = Math.min(data.length, 10 * ctx.sampleRate);
+                for (let i = 0; i < sampleLength; i++) {
+                  data[i] = Math.sin(i * 0.01 * (1 + Math.sin(i * 0.0001) * 0.5)) * 0.5;
+                }
+              }
+              
+              setAudioBuffer(buffer);
+              
+              toast.info("Simulated network audio loaded.");
+              resolve();
+              return;
+            }
+          } catch (error) {
+            console.error("Error creating synthetic audio:", error);
+            reject(error);
+          }
+          
+          toast.info("Remarque: L'accès aux fichiers réseau est simulé. Un fichier de test est disponible.");
+        }, 1000);
+      }
+    });
   }, [audioSrc, getAudioContext, setAudioSrc, setAudioBuffer, setIsPlaying, setCurrentTime, initializeMarkers, audioRef]);
 
   useEffect(() => {
