@@ -20,6 +20,7 @@ const Index = () => {
     markers,
     addMarker,
     removeMarker,
+    setMarkers,
     exportTrimmedAudio,
     loadAudioFile,
     loadFilesFromUNC,
@@ -35,17 +36,20 @@ const Index = () => {
     currentAudioFile,
     isBuffering,
     showMarkerControls,
-    setShowMarkerControls
+    setShowMarkerControls,
+    audioRef
   } = useAudio();
 
-  const handleFileSelect = (file) => {
+  const handleFileSelect = async (file) => {
     setShowMarkerControls(false);
-    loadAudioFile(file);
+    await loadAudioFile(file);
+    setMarkers([]); // Clear markers when loading a new file
   };
 
   const handleSearch = (path, city, date, hour) => {
     setShowMarkerControls(false);
     loadFilesFromUNC(path, city, date, hour);
+    setMarkers([]); // Clear markers when loading a new file
   };
 
   const handleExport = async () => {
@@ -128,6 +132,8 @@ const Index = () => {
               audioTitle={currentAudioFile ? currentAudioFile.name : "No audio loaded"}
               isLoading={isLoading}
               isBuffering={isBuffering}
+              audioRef={audioRef}
+              markers={markers}
             />
           </div>
 
