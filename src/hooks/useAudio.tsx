@@ -126,6 +126,7 @@ export const useAudio = () => {
     changeVolume,
     addMarker,
     removeMarker,
+    setMarkers,
     exportTrimmedAudio,
     loadAudioFile,
     loadFilesFromUNC,
