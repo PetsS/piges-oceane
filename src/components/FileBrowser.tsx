@@ -201,8 +201,8 @@ export const FileBrowser = ({
             onClick={handleSearch}
             disabled={!selectedDate}
           >
-            <Search className="h-4 w-4 mr-2" />
-            Rechercher les fichiers audio
+            {/* <Search className="h-4 w-4 mr-2" /> */}
+            Charger le fichier audio
           </Button>
         </div>
       </div>
@@ -216,7 +216,7 @@ export const FileBrowser = ({
               <div className="relative">
                 <div className="h-10 w-10 rounded-full border-2 border-primary/30 border-t-primary animate-spin"></div>
               </div>
-              <p className="text-sm text-muted-foreground">Recherche de fichiers audio...</p>
+              <p className="text-sm text-muted-foreground">Charger l'audio...</p>
             </div>
           </div>
         ) : files.length === 0 ? (
