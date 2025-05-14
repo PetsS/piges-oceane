@@ -2,6 +2,7 @@
 import { useState, useCallback, memo, useEffect, useRef } from "react";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
+import { AudioMarker } from "@/hooks/useAudio";
 import { 
   Play, 
   Pause, 
@@ -13,6 +14,13 @@ import {
   ChevronsRight,
   Loader2
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+} from "@/components/ui/tooltip";
+
 
 interface AudioPlayerProps {
   isPlaying: boolean;
@@ -26,6 +34,8 @@ interface AudioPlayerProps {
   audioTitle?: string;
   isLoading?: boolean;
   isBuffering?: boolean;
+  markers?: AudioMarker[];
+  audioRef: React.RefObject<HTMLAudioElement>;
 }
 
 // Use memo to prevent unnecessary re-renders
@@ -41,6 +51,8 @@ export const AudioPlayer = memo(({
   audioTitle = "Aucun audio chargé",
   isLoading = false,
   isBuffering = false,
+  markers = [],
+  audioRef,
 }: AudioPlayerProps) => {
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
   const [playbackEnabled, setPlaybackEnabled] = useState(false);
@@ -94,6 +106,35 @@ export const AudioPlayer = memo(({
       console.error("Error in play/pause handler:", error);
     }
   }, [onPlayPause]);
+
+  // Handle playback from the IN marker and stop at OUT or end
+  const handlePlayFromSelection = useCallback(() => {
+    if (!audioRef.current) return;
+  
+    const startMarker = markers.find((m) => m.type === "start");
+    const endMarker = markers.find((m) => m.type === "end");
+  
+    if (!startMarker) return;
+  
+    const startTime = startMarker.position;
+    const stopTime = endMarker ? endMarker.position : duration;
+  
+    if (startTime >= stopTime) return;
+  
+    const audioEl = audioRef.current;
+  
+    audioEl.currentTime = startTime;
+    audioEl.play().catch(console.error);
+  
+    const stopListener = () => {
+      if (audioEl.currentTime >= stopTime) {
+        audioEl.pause();
+        audioEl.removeEventListener("timeupdate", stopListener);
+      }
+    };
+  
+    audioEl.addEventListener("timeupdate", stopListener);
+  }, [audioRef, markers, duration]);  
 
   return (
     <div className="glass-panel rounded-lg p-4 animate-fade-in">
@@ -167,24 +208,58 @@ export const AudioPlayer = memo(({
             <ChevronsLeft className="h-5 w-5" />
           </Button>
           
-          <Button
-            ref={playButtonRef}
-            variant="default"
-            size="icon"
-            className="rounded-full h-14 w-14 transition-all hover:scale-105 active:scale-95"
-            onClick={handlePlayPause}
-            disabled={!playbackEnabled || isLoading}
-            aria-label={isPlaying ? "Pause" : "Play"}
-          >
-            {isBuffering ? (
-              <Loader2 className="h-6 w-6 animate-spin" />
-            ) : isPlaying ? (
-              <Pause className="h-6 w-6" />
-            ) : (
-              <Play className="h-6 w-6 ml-1" />
-            )}
-          </Button>
-          
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  ref={playButtonRef}
+                  variant="default"
+                  size="icon"
+                  className="rounded-full h-14 w-14 transition-all hover:scale-105 active:scale-95"
+                  onClick={handlePlayPause}
+                  disabled={!playbackEnabled || isLoading}
+                  aria-label={isPlaying ? "Pause" : "Play"}
+                >
+                  {isBuffering ? (
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  ) : isPlaying ? (
+                    <Pause className="h-6 w-6" />
+                  ) : (
+                    <Play className="h-6 w-6 ml-1" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <p>{isPlaying ? "Mettre en pause" : "Lire depuis la position actuelle"}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          {markers.some((m) => m.type === "start") && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="rounded-full h-14 w-14 text-green-600 border-green-500 hover:bg-green-100 transition-all hover:scale-105 active:scale-95"
+                    onClick={handlePlayFromSelection}
+                    disabled={!playbackEnabled || isLoading}
+                    aria-label="Lecture depuis le marqueur"
+                  >
+                    <Play className="h-6 w-6 ml-1" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  <p>
+                    Lire depuis la sélection
+                    {markers.some((m) => m.type === "end") && " jusqu’au marqueur OUT"}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+
           <Button
             variant="ghost"
             size="icon"
