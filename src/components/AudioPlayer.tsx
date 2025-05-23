@@ -165,7 +165,7 @@ export const AudioPlayer = memo(({
             </Button>
             
             {showVolumeSlider && (
-              <div className="absolute right-full mr-2 top-1/2 -translate-y-1/2 bg-background/90 backdrop-blur-sm p-3 rounded-md shadow-md border flex items-center w-24 transition-all duration-300">
+              <div className="absolute right-full mr-3 top-1/2 -translate-y-1/2 bg-background/90 backdrop-blur-sm p-3 rounded-md shadow-md border flex items-center w-24">
                 <Slider
                   value={[volume * 100]}
                   min={0}
@@ -197,7 +197,7 @@ export const AudioPlayer = memo(({
           </div>
         </div>
         
-        <div className="flex items-center justify-center space-x-2">
+        <div className="flex flex-wrap items-center justify-center gap-2 sm:flex-nowrap">
           <Button
             variant="ghost"
             size="icon"
@@ -235,19 +235,29 @@ export const AudioPlayer = memo(({
             </Tooltip>
           </TooltipProvider>
 
+          <Button
+            variant="ghost"
+            size="icon"
+            className="rounded-full h-10 w-10"
+            onClick={handleSkipForward}
+            disabled={!playbackEnabled || isLoading || isBuffering}
+          >
+            <ChevronsRight className="h-5 w-5" />
+          </Button>
+
           {markers.some((m) => m.type === "start") && (
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
                     variant="outline"
-                    size="icon"
-                    className="rounded-full h-14 w-14 text-green-600 border-green-500 hover:bg-green-100 transition-all hover:scale-105 active:scale-95"
+                    className="w-full sm:w-auto inline-flex items-center space-x-2 px-5 py-2 bg-green-50 border-green-200 hover:bg-green-100 transition-all hover:scale-105 active:scale-95 rounded-full animate-fade-in"
                     onClick={handlePlayFromSelection}
                     disabled={!playbackEnabled || isLoading}
                     aria-label="Lecture depuis le marqueur"
                   >
-                    <Play className="h-6 w-6 ml-1" />
+                    <Play className="text-green-500 h-6 w-6 ml-1" />
+                    <span>Jouer la sélection</span>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="top">
@@ -260,15 +270,7 @@ export const AudioPlayer = memo(({
             </TooltipProvider>
           )}
 
-          <Button
-            variant="ghost"
-            size="icon"
-            className="rounded-full h-10 w-10"
-            onClick={handleSkipForward}
-            disabled={!playbackEnabled || isLoading || isBuffering}
-          >
-            <ChevronsRight className="h-5 w-5" />
-          </Button>
+          
         </div>
       </div>
     </div>
