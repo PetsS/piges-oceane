@@ -28,8 +28,7 @@ const defaultSettings: Settings = {
   headerTitle: 'Audio Marker Interface',
   logoUrl: null,
   enableNotifications: true,
-  cities: citiesConfig,
-  // audioFolderPath: '\\\\server\\audioLogs',
+  cities: citiesConfig.departs, // Default to depart cities
   audioFolderPath: '/audio',
   buttonColors: {
     primary: '#1F4A4F',
