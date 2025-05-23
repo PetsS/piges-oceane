@@ -26,7 +26,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       const fetchedSettings = await getSettings();
       // Ensure we use the cities from the configuration file if not available in fetched settings
       if (!fetchedSettings.cities || fetchedSettings.cities.length === 0) {
-        fetchedSettings.cities = citiesConfig;
+        fetchedSettings.cities = citiesConfig.departs // Default to depart cities
       }
       setSettings(fetchedSettings);
       
@@ -69,25 +69,27 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // Clear any existing settings in localStorage to force using the new defaults
-    localStorage.removeItem('serverSettings');
-    fetchSettings();
+    if (process.env.NODE_ENV === "development") {
+      localStorage.removeItem('serverSettings');
+    } // For development, clear localStorage to avoid stale settings
+    fetchSettings(); // Fetch settings on component mount
     
     // Add observer to document ready state to ensure theme is applied
-    if (document.readyState === 'complete') {
-      setTimeout(() => {
-        if (settings) {
-          applyTheme(settings);
-          console.log('Theme applied on document complete');
-        }
-      }, 500);
-    } else {
-      window.addEventListener('load', () => {
-        if (settings) {
-          applyTheme(settings);
-          console.log('Theme applied on window load');
-        }
-      });
-    }
+    // if (document.readyState === 'complete') {
+    //   setTimeout(() => {
+    //     if (settings) {
+    //       applyTheme(settings);
+    //       console.log('Theme applied on document complete');
+    //     }
+    //   }, 500);
+    // } else {
+    //   window.addEventListener('load', () => {
+    //     if (settings) {
+    //       applyTheme(settings);
+    //       console.log('Theme applied on window load');
+    //     }
+    //   });
+    // }
   }, []);
 
   return (
