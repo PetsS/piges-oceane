@@ -5,7 +5,7 @@ import { AudioMarker } from './useAudioTypes';
 import { useAudioContext } from './useAudioContext';
 import { ffmpeg } from '@/utils/ffmpegInstance';
 import { fetchFile } from '@ffmpeg/util';
-import { trimmedBufferToWav } from '@/utils/audioUtils';
+// import { trimmedBufferToWav } from '@/utils/audioUtils';
 
 export const useAudioExport = (
   audioBuffer: AudioBuffer | null,
