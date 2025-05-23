@@ -7,6 +7,7 @@ export interface AudioMarker {
 
 export interface AudioFile {
   name: string;
+  url: string;
   path: string;
   size: string;
   type: string;
