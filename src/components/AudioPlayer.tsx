@@ -165,7 +165,7 @@ export const AudioPlayer = memo(({
             </Button>
             
             {showVolumeSlider && (
-              <div className="absolute -left-8 bottom-12 bg-background/90 backdrop-blur-sm p-3 rounded-md shadow-md border flex items-center w-24 transition-all duration-300 animate-fade-in">
+              <div className="absolute right-full mr-2 top-1/2 -translate-y-1/2 bg-background/90 backdrop-blur-sm p-3 rounded-md shadow-md border flex items-center w-24 transition-all duration-300">
                 <Slider
                   value={[volume * 100]}
                   min={0}
