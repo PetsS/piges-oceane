@@ -136,6 +136,7 @@ export const useAudioFiles = (
         const mockFile: AudioFile = {
           name: `${hour}.mp3`,
           path: path,
+          url: encodeURI(path.replace(/\\/g, '/')),
           size: '140 MB',
           type: 'audio/mpeg',
           lastModified: format(date, 'yyyy-MM-dd')
@@ -152,10 +153,12 @@ export const useAudioFiles = (
           const basePath = path.includes('\\\\') 
             ? path.substring(0, path.lastIndexOf('\\')) 
             : path.substring(0, path.lastIndexOf('/'));
+          const filePath = `${basePath}\\${hourStr}.mp3`;
           
           return {
             name: `${hourStr}.mp3`,
             path: `${basePath}\\${hourStr}.mp3`,
+            url: encodeURI(filePath.replace(/\\/g, '/')),
             size: '140 MB',
             type: 'audio/mpeg',
             lastModified: format(date, 'yyyy-MM-dd')
@@ -182,16 +185,16 @@ export const useAudioFiles = (
     }
     
     const prevHourString = prevHour.toString().padStart(2, '0');
-    
+
     // Use the first city from settings or config
-    const defaultCity = settings.cities && settings.cities.length > 0 
-      ? settings.cities[0].folderName 
-      : citiesConfig[0].folderName;
+    const defaultCity =
+      settings?.cities?.[0]?.folderName ??
+      citiesConfig?.[0]?.folderName ??
+      'Angers';
     
     const audioFolderPath = settings.audioFolderPath || '\\\\server\\audioLogs';
     
     // Default type (departs)
-    // const defaultType = 'departs';
     const defaultType = 'Départs';
     
     loadFilesFromUNC(
