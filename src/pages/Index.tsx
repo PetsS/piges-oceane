@@ -6,7 +6,7 @@ import { LocalAudioLoader } from "@/components/LocalAudioLoader";
 import { AudioConverter } from "@/components/AudioConverter";
 import { useAudio } from "@/hooks/useAudio";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Headphones } from "lucide-react";
+import { CassetteTapeIcon, HeadphonesIcon } from "lucide-react";
 import { useSettings } from "@/contexts/SettingsContext";
 import { Button } from "@/components/ui/button";
 
@@ -71,32 +71,38 @@ const Index = () => {
     return (
       <div className="h-screen flex items-center justify-center bg-background">
         <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4">Loading settings...</h2>
-          <p>Retrieving settings from the server...</p>
+          <h2 className="text-2xl font-bold mb-4">Chargement des paramètres...</h2>
+          <p>Récupération des paramètres du serveur...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-background">
-      <header className="bg-background border-b py-4 px-6">
-        <div>
+    <div className="min-h-screen flex flex-col bg-background">
+      <header className="bg-[#ffcc00]/100 border-b py-4 px-6">
+        <div className="flex flex-col-md:flex-row items-center justify-between">
+          <img
+            src="img/hw_logo.webp"
+            alt="Logo"
+            className="h-10 w-10"
+          />
+          <div className="flex items-center space-x-2 mt-2 md:mt-0">
           <h1 className="text-2xl font-bold">
-            <span style={{ color: settings.buttonColors.primary }}>A</span>udio 
-            <span style={{ color: settings.buttonColors.primary }}> M</span>arker 
-            <span style={{ color: settings.buttonColors.primary }}> I</span>nterface
+            <span>Pige</span>
           </h1>
+            <CassetteTapeIcon className="h-8 w-8"/>
+          </div>
         </div>
       </header>
 
-      <div className="flex-1 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6 p-6 overflow-hidden">
-        <div className="md:col-span-1 h-full overflow-hidden">
+      <div className="flex-1 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6 p-6">
+        <div className="md:col-span-1 h-full flex flex-col min-h-0 overflow-hidden">
           <Tabs defaultValue="browser" className="h-full flex flex-col">
-            <TabsList className="grid grid-cols-3 w-full mb-4">
-              <TabsTrigger value="browser">Server</TabsTrigger>
-              <TabsTrigger value="local">Local files</TabsTrigger>
-              <TabsTrigger value="convert">Convert</TabsTrigger>
+            <TabsList className="grid grid-cols-2 w-full mb-2">
+              <TabsTrigger value="browser">Serveur</TabsTrigger>
+              <TabsTrigger value="local">Fichiers</TabsTrigger>
+              {/* <TabsTrigger value="convert">Convertir</TabsTrigger> */}
             </TabsList>
             
             <TabsContent value="browser" className="flex-1 overflow-hidden">
@@ -119,7 +125,7 @@ const Index = () => {
         </div>
 
         <div className="md:col-span-2 lg:col-span-3 flex flex-col space-y-4 h-full overflow-hidden">
-          <div className="flex-1 min-h-0">
+          <div>
             <AudioPlayer
               isPlaying={isPlaying}
               currentTime={currentTime}
@@ -144,8 +150,8 @@ const Index = () => {
                   onClick={() => setShowMarkerControls(true)}
                   className="animate-fade-in"
                 >
-                  <Headphones className="h-4 w-4 mr-2" />
-                  Edit audio
+                  <HeadphonesIcon className="h-4 w-4 mr-2" />
+                  Editer l'audio
                 </Button>
               </div>
             )}
@@ -155,6 +161,7 @@ const Index = () => {
                 markers={markers}
                 onAddMarker={addMarker}
                 onExport={handleExport}
+                onResetMarkers={() => setMarkers([])}
                 currentTime={currentTime}
                 formatTimeDetailed={formatTimeDetailed}
                 isExporting={isExporting}
