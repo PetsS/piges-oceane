@@ -96,7 +96,8 @@
   }
 
   html, body, #root {
-    @apply h-full w-full overflow-hidden;
+    /* @apply h-full w-full overflow-hidden; */
+    @apply min-h-screen w-full overflow-x-hidden overflow-auto;
   }
 
   body {
