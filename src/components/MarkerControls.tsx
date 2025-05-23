@@ -6,15 +6,26 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog"; // Adjust import path if needed
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { AudioMarker } from "@/hooks/useAudio";
-import { ArrowLeftToLine, ArrowRightToLine, Scissors } from "lucide-react";
+import { ArrowLeftToLine, ArrowRightToLine, Delete, DeleteIcon, EraserIcon, Scissors, Trash2Icon } from "lucide-react";
 import { AudioExporter } from "./AudioExporter";
 
 interface MarkerControlsProps {
   markers: AudioMarker[];
   onAddMarker: (type: "start" | "end") => void;
   onExport: () => void;
+  onResetMarkers: () => void;
   currentTime: number;
   formatTimeDetailed: (time: number) => string;
   isExporting?: boolean;
@@ -24,6 +35,7 @@ export const MarkerControls = ({
   markers,
   onAddMarker,
   onExport,
+  onResetMarkers,
   currentTime,
   formatTimeDetailed,
   isExporting = false,
@@ -35,6 +47,13 @@ export const MarkerControls = ({
     (startMarker || endMarker) &&
     (!startMarker || !endMarker || startMarker.position < endMarker.position);
 
+  const [showConfirmReset, setShowConfirmReset] = useState(false);
+
+  const handleConfirmReset = () => {
+    onResetMarkers();     // Perform actual reset
+    setShowConfirmReset(false); // Close modal
+  };
+    
   return (
     <div className="flex flex-col glass-panel rounded-lg p-4 space-y-4 animate-fade-in">
       <div className="flex justify-between items-center">
@@ -44,13 +63,13 @@ export const MarkerControls = ({
         </Badge>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="flex flex-wrap gap-3">
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant="outline"
-                className={`flex items-center justify-center space-x-2 group ${
+                className={`flex-grow sm:flex-grow-1 sm:w-full md:w-auto flex items-center justify-center space-x-2 group ${
                   startMarker
                     ? "bg-green-50 border-green-200 hover:bg-green-100"
                     : ""
@@ -76,7 +95,7 @@ export const MarkerControls = ({
             <TooltipTrigger asChild>
               <Button
                 variant="outline"
-                className={`flex items-center justify-center space-x-2 group ${
+                className={`flex-grow sm:flex-grow-1 sm:w-full md:w-auto flex items-center justify-center space-x-2 group ${
                   endMarker
                     ? "bg-red-50 border-red-200 hover:bg-red-100"
                     : ""
@@ -93,6 +112,29 @@ export const MarkerControls = ({
             </TooltipTrigger>
             <TooltipContent side="bottom">
               <p>Définir le point de fin pour le découpage</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="text-destructive hover:bg-red-100 sm:ml-auto"
+                onClick={() => {
+                  if (markers.length > 0) {
+                    setShowConfirmReset(true);
+                  }
+                }}
+                disabled={markers.length === 0}
+              >
+                <Trash2Icon/>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p>Effacer les marqueurs</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -126,6 +168,25 @@ export const MarkerControls = ({
             </div>
           </div>
         )}
+
+        <Dialog open={showConfirmReset} onOpenChange={setShowConfirmReset}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Confirmer l'effacement des marqueurs</DialogTitle>
+              <DialogDescription>
+                Êtes-vous sûr de vouloir effacer tous les marqueurs ?
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowConfirmReset(false)}>
+                Annuler
+              </Button>
+              <Button variant="destructive" onClick={handleConfirmReset}>
+                Effacer
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <AudioExporter 
           markers={markers}
