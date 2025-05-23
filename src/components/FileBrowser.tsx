@@ -38,12 +38,10 @@ export const FileBrowser = ({
 }: FileBrowserProps) => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedHour, setSelectedHour] = useState<string | null>(null);
-  // const [audioFolderPath, setAudioFolderPath] = useState("\\\\server\\audioLogs");
   const [audioFolderPath, setAudioFolderPath] = useState("/audio");
-  const [selectedCityFolder, setSelectedCityFolder] = useState<string>(citiesConfig[0]?.folderName || "01_Brest");
-  // const [selectedType, setSelectedType] = useState<string>(typesConfig[0]?.folderName || "departs");
+  const [selectedCityFolder, setSelectedCityFolder] = useState<string>(citiesConfig[0]?.folderName || "Angers");
   const [selectedType, setSelectedType] = useState<string>(typesConfig[0]?.folderName || "Départs");
-  const [cities, setCities] = useState<CityFolder[]>(citiesConfig);
+  const [cities, setCities] = useState<CityFolder[]>(citiesConfig.departs);
   const [types, setTypes] = useState(typesConfig);
   const [isLocalPath, setIsLocalPath] = useState(false);
   const [currentHour, setCurrentHour] = useState<number>(new Date().getHours());
@@ -73,6 +71,31 @@ export const FileBrowser = ({
       setSelectedCityFolder(settings.cities[0]?.folderName || citiesConfig[0]?.folderName);
     }
   }, [settings]);
+
+  // Update cities based on selected type and settings
+  useEffect(() => {
+    const isDeparts = selectedType.toLowerCase().includes("depart");
+  
+    const selectedCities =
+      settings && settings.cities && settings.cities.length > 0
+        ? settings.cities
+        : isDeparts
+        ? citiesConfig.departs
+        : citiesConfig.retours;
+  
+    setCities(selectedCities);
+    setSelectedCityFolder(selectedCities[0]?.folderName || "Angers");
+  }, [selectedType, settings]);
+  
+  // Update selected city folder when cities change
+  useEffect(() => {
+    const typeLower = selectedType.toLowerCase();
+    if (typeLower.includes("retour")) {
+      setCities(citiesConfig.retours);
+    } else {
+      setCities(citiesConfig.departs);
+    }
+  }, [selectedType]);
 
   const handleSearch = () => {
     if (!selectedDate) return;
@@ -170,7 +193,7 @@ export const FileBrowser = ({
               <Clock className="h-4 w-4" />
               <span>Sélectionner une heure</span>
             </label>
-            <div className="grid grid-cols-6 gap-1.5">
+            <div className="grid grid-cols-4 gap-1.5">
               {hours.map((hour) => {
                 const hourNumber = parseInt(hour, 10);
                 const disabled = isHourDisabled(hourNumber);
@@ -236,7 +259,7 @@ export const FileBrowser = ({
                 className={cn(
                   "w-full text-left flex items-center p-3 rounded-md transition-all",
                   "hover:bg-secondary/80 focus:outline-none focus:bg-secondary/80",
-                  "active:scale-[0.98] hover:shadow-sm"
+                  "active:scale-[0.98] hover:shadow-sm",
                 )}
               >
                 <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 mr-3">
@@ -244,16 +267,17 @@ export const FileBrowser = ({
                 </div>
                 <div className="flex-1 overflow-hidden">
                   <div className="font-medium truncate">{file.name}</div>
-                  <div className="flex text-xs text-muted-foreground space-x-2">
+                  <div className="flex text-xs text-muted-foreground space-x-1.5">
                     <span>{file.size}</span>
                     <span>•</span>
                     <span>{file.type.split("/")[1]}</span>
                   </div>
+                  <div className="flex items-center space-y-1 space-x-1 text-xs text-muted-foreground">
+                    <Clock className="h-3 w-3" />
+                    <span>{file.lastModified}</span>
+                  </div>
                 </div>
-                <div className="flex items-center space-x-1 text-xs text-muted-foreground">
-                  <Clock className="h-3 w-3" />
-                  <span>{file.lastModified}</span>
-                </div>
+                
               </button>
             ))}
           </div>
