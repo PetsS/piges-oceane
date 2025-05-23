@@ -1,87 +1,170 @@
-
-[
-  {
-    "displayName": "Angers",
-    "folderName": "17_Angers"
-  },
-  {
-    "displayName": "Brest",
-    "folderName": "01_Brest"
-  },
-  {
-    "displayName": "Carhaix",
-    "folderName": "19_Carhaix"
-  },
-  {
-    "displayName": "Chateaubriant",
-    "folderName": "18_Chateaubriant"
-  },
-  {
-    "displayName": "Cholet",
-    "folderName": "07_Cholet"
-  },
-  {
-    "displayName": "Dinan",
-    "folderName": "14_Dinan"
-  },
-  {
-    "displayName": "La Roche sur Yon",
-    "folderName": "11_LaRochesurYon"
-  },
-  {
-    "displayName": "Laval",
-    "folderName": "10_Laval"
-  },
-  {
-    "displayName": "Les Sables d'Olonne",
-    "folderName": "13_Les_Sables"
-  },
-  {
-    "displayName": "Lorient",
-    "folderName": "02_Lorient"
-  },
-  {
-    "displayName": "Loudeac",
-    "folderName": "20_Loudeac"
-  },
-  {
-    "displayName": "Nantes",
-    "folderName": "03_Nantes"
-  },
-  {
-    "displayName": "Ploermel",
-    "folderName": "17_Ploermel"
-  },
-  {
-    "displayName": "Quimper",
-    "folderName": "09_Quimper"
-  },
-  {
-    "displayName": "Quimper",
-    "folderName": "13_Quimper"
-  },
-  {
-    "displayName": "Redon",
-    "folderName": "15_Redon"
-  },
-  {
-    "displayName": "Rennes",
-    "folderName": "04_Rennes"
-  },
-  {
-    "displayName": "Saint-Brieuc",
-    "folderName": "05_ST_Brieuc"
-  },
-  {
-    "displayName": "Saint-Gilles",
-    "folderName": "12_St_Gilles"
-  },
-  {
-    "displayName": "Saint-Nazaire",
-    "folderName": "06_ST_Nazaire"
-  },
-  {
-    "displayName": "Vannes",
-    "folderName": "08_Vannes"
-  }
-]
+{
+  "departs" : [
+    {
+      "displayName": "Angers",
+      "folderName": "Angers"
+    },
+    {
+      "displayName": "Brest",
+      "folderName": "Brest"
+    },
+    {
+      "displayName": "Carhaix",
+      "folderName": "Carhaix"
+    },
+    {
+      "displayName": "Chateaubriant",
+      "folderName": "Chateaubriant"
+    },
+    {
+      "displayName": "Cholet",
+      "folderName": "Cholet"
+    },
+    {
+      "displayName": "Dinan",
+      "folderName": "Dinan"
+    },
+    {
+      "displayName": "La Rochelle",
+      "folderName": "La_Rochelle"
+    },
+    {
+      "displayName": "Laval",
+      "folderName": "Laval"
+    },
+    {
+      "displayName": "Le Mans",
+      "folderName": "Le_Mans"
+    },
+    {
+      "displayName": "Lorient",
+      "folderName": "Lorient"
+    },
+    {
+      "displayName": "Morlaix",
+      "folderName": "Morlaix"
+    },
+    {
+      "displayName": "Nantes",
+      "folderName": "Nantes"
+    },
+    {
+      "displayName": "Ploermel",
+      "folderName": "Ploermel"
+    },
+    {
+      "displayName": "Quimper",
+      "folderName": "Quimper"
+    },
+    {
+      "displayName": "Redon",
+      "folderName": "Redon"
+    },
+    {
+      "displayName": "Rennes",
+      "folderName": "Rennes"
+    },
+    {
+      "displayName": "Saint-Brieuc",
+      "folderName": "ST_Brieuc"
+    },
+    {
+      "displayName": "Saint-Nazaire",
+      "folderName": "ST_Nazaire"
+    },
+    {
+      "displayName": "Tours",
+      "folderName": "Tours"
+    },
+    {
+      "displayName": "Vannes",
+      "folderName": "Vannes"
+    },
+    {
+      "displayName": "Vendee",
+      "folderName": "Vendee"
+    }
+  ],
+  "retours" : [
+    {
+      "displayName": "Angers",
+      "folderName": "Angers"
+    },
+    {
+      "displayName": "Brest",
+      "folderName": "Brest"
+    },
+    {
+      "displayName": "Carhaix",
+      "folderName": "Carhaix"
+    },
+    {
+      "displayName": "Chateaubriant",
+      "folderName": "Chateaubriant"
+    },
+    {
+      "displayName": "Cholet",
+      "folderName": "Cholet"
+    },
+    {
+      "displayName": "Dinan",
+      "folderName": "Dinan"
+    },
+    {
+      "displayName": "La Roche sur Yon",
+      "folderName": "LaRochesurYon"
+    },
+    {
+      "displayName": "Laval",
+      "folderName": "Laval"
+    },
+    {
+      "displayName": "Les Sables d'Olonne",
+      "folderName": "Les_Sables"
+    },
+    {
+      "displayName": "Lorient",
+      "folderName": "Lorient"
+    },
+    {
+      "displayName": "Loudeac",
+      "folderName": "Loudeac"
+    },
+    {
+      "displayName": "Nantes",
+      "folderName": "Nantes"
+    },
+    {
+      "displayName": "Ploermel",
+      "folderName": "Ploermel"
+    },
+    {
+      "displayName": "Quimper",
+      "folderName": "Quimper"
+    },
+    {
+      "displayName": "Redon",
+      "folderName": "Redon"
+    },
+    {
+      "displayName": "Rennes",
+      "folderName": "Rennes"
+    },
+    {
+      "displayName": "Saint-Brieuc",
+      "folderName": "ST_Brieuc"
+    },
+    {
+      "displayName": "Saint-Gilles",
+      "folderName": "St_Gilles"
+    },
+    {
+      "displayName": "Saint-Nazaire",
+      "folderName": "ST_Nazaire"
+    },
+    {
+      "displayName": "Vannes",
+      "folderName": "Vannes"
+    }
+  ]
+}
