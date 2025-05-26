@@ -43,6 +43,7 @@ export const LocalAudioLoader = ({ onFileLoad }: LocalAudioLoaderProps) => {
     const audioFile: AudioFile = {
       name: file.name,
       path: blobUrl,
+      url: blobUrl,
       size: `${size} MB`,
       type: file.type,
       lastModified: format(new Date(file.lastModified), 'yyyy-MM-dd')
