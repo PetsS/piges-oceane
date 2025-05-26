@@ -1,10 +1,12 @@
 
 [
   {
+    "initial": "D",
     "displayName": "Départs",
     "folderName": "Départs"
   },
   {
+    "initial": "R",
     "displayName": "Retours",
     "folderName": "Retours"
   }
