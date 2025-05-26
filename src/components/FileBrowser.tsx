@@ -17,6 +17,7 @@ import {
 import typesConfig from "@/config/types.json";
 import citiesConfig from "@/config/cities.json";
 import { useSettings } from "@/contexts/SettingsContext";
+import { getTypeInitial } from "@/utils/getTypeInitial";
 
 interface CityFolder {
   displayName: string;
@@ -27,7 +28,7 @@ interface FileBrowserProps {
   files: AudioFile[];
   onFileSelect: (file: AudioFile) => void;
   isLoading: boolean;
-  onPathChange: (path: string, city: string, date: Date, hour: string | null) => void;
+  onPathChange: (path: string, city: string, date: Date, hour: string | null, typeInitial: string) => void;
 }
 
 export const FileBrowser = ({
@@ -102,6 +103,7 @@ export const FileBrowser = ({
     
     // Format date as YYYY-MM-DD for folder structure
     const dateFolder = format(selectedDate, "yyyy-MM-dd");
+    const typeInitial = getTypeInitial(selectedType);
     
     // Generate path based on the type and other parameters
     let fullPath;
@@ -113,8 +115,8 @@ export const FileBrowser = ({
       // For network paths (UNC), ensure the format starts with double backslashes
       fullPath = `${audioFolderPath}\\${selectedType}\\${selectedCityFolder}\\${dateFolder}${selectedHour ? `\\${selectedHour}.mp3` : ''}`;
     }
-    
-    onPathChange(fullPath, selectedCityFolder, selectedDate, selectedHour);
+
+    onPathChange(fullPath, selectedCityFolder, selectedDate, selectedHour, typeInitial);
   };
 
   const isHourDisabled = (hour: number): boolean => {
