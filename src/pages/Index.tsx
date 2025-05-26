@@ -46,9 +46,9 @@ const Index = () => {
     setMarkers([]); // Clear markers when loading a new file
   };
 
-  const handleSearch = (path, city, date, hour) => {
+  const handleSearch = (path, city, date, hour, typeInitial) => {
     setShowMarkerControls(false);
-    loadFilesFromUNC(path, city, date, hour);
+    loadFilesFromUNC(path, city, date, hour, typeInitial);
     setMarkers([]); // Clear markers when loading a new file
   };
 
