@@ -144,7 +144,7 @@ export const AudioPlayer = memo(({
             <Music className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h3 className="font-medium truncate max-w-[200px]">
+            <h3 className="font-medium truncate">
               {isLoading ? "Chargement..." : audioTitle}
             </h3>
             <p className="text-xs text-muted-foreground">
