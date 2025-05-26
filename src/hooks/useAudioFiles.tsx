@@ -5,6 +5,7 @@ import { format } from 'date-fns';
 import { AudioFile } from './useAudioTypes';
 import { useSettings } from '@/contexts/SettingsContext';
 import citiesConfig from "@/config/cities.json";
+import { getTypeInitial } from '@/utils/getTypeInitial';
 
 export const useAudioFiles = (
   setAudioSrc: (src: string | null) => void,
@@ -126,7 +127,7 @@ export const useAudioFiles = (
     loadAudioFileRef.current = loadAudioFile;
   }, [loadAudioFile]);
   
-  const loadFilesFromUNC = useCallback(async (path: string, city: string, date: Date, hour: string | null) => {
+  const loadFilesFromUNC = useCallback(async (path: string, city: string, date: Date, hour: string | null, typeInitial: string) => {
     setIsLoading(true);
     
     setTimeout(() => {
@@ -134,7 +135,7 @@ export const useAudioFiles = (
       
       if (hour) {
         const mockFile: AudioFile = {
-          name: `${hour}.mp3`,
+          name: `${typeInitial}_${city}_${dateStr}_${hour}.mp3`,
           path: path,
           url: encodeURI(path.replace(/\\/g, '/')),
           size: '140 MB',
@@ -144,9 +145,8 @@ export const useAudioFiles = (
         
         setAudioFiles([mockFile]);
         
-        if (loadAudioFileRef.current) {
-          loadAudioFileRef.current(mockFile);
-        }
+        loadAudioFile(mockFile);
+
       } else {
         const mockFiles: AudioFile[] = Array.from({ length: 24 }, (_, i) => {
           const hourStr = i.toString().padStart(2, '0');
@@ -156,7 +156,7 @@ export const useAudioFiles = (
           const filePath = `${basePath}\\${hourStr}.mp3`;
           
           return {
-            name: `${hourStr}.mp3`,
+            name: `${typeInitial}_${city}_${format(date, 'yyyy-MM-dd')}_${hourStr}.mp3`,
             path: `${basePath}\\${hourStr}.mp3`,
             url: encodeURI(filePath.replace(/\\/g, '/')),
             size: '140 MB',
@@ -196,12 +196,14 @@ export const useAudioFiles = (
     
     // Default type (departs)
     const defaultType = 'Départs';
+    const typeInitial = getTypeInitial(defaultType);
     
     loadFilesFromUNC(
       `${audioFolderPath}\\${defaultType}\\${defaultCity}\\${format(today, 'yyyy-MM-dd')}\\${prevHourString}.mp3`, 
       defaultCity, 
       today, 
-      prevHourString
+      prevHourString,
+      typeInitial
     );
   }, [settings, loadFilesFromUNC]);
 
