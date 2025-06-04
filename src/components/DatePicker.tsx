@@ -1,6 +1,6 @@
 
 import * as React from "react";
-import { format } from "date-fns";
+import { format, subMonths } from "date-fns";
 import { fr } from "date-fns/locale";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -45,7 +45,10 @@ export function DatePicker({ date, onSelect }: DatePickerProps) {
           mode="single"
           selected={date}
           onSelect={handleDateSelect}
-          disabled={(date) => date > new Date()}
+          disabled={(date) => {
+            const today = new Date();
+            return date > today || date < subMonths(today, 4); // Disable future dates and dates older than 4 months
+          }}
           initialFocus
           locale={fr}
         />
