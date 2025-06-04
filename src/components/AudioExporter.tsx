@@ -64,11 +64,6 @@ export const AudioExporter = ({
               )}
             </div>
           </div>
-          <div>
-            <Badge variant="outline" className="text-xs">
-              MP3
-            </Badge>
-          </div>
         </div>
       )}
 
