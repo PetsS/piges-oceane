@@ -18,8 +18,9 @@ import {
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { AudioMarker } from "@/hooks/useAudio";
-import { ArrowLeftToLine, ArrowRightToLine, Delete, DeleteIcon, EraserIcon, Scissors, Trash2Icon } from "lucide-react";
+import { ArrowLeftToLine, ArrowRightToLine, Delete, DeleteIcon, EraserIcon, Scissors, Trash2Icon, Pencil } from "lucide-react";
 import { AudioExporter } from "./AudioExporter";
+import { parseTimeString } from "@/utils/timeParser";
 
 interface MarkerControlsProps {
   markers: AudioMarker[];
@@ -53,6 +54,9 @@ export const MarkerControls = ({
     onResetMarkers();     // Perform actual reset
     setShowConfirmReset(false); // Close modal
   };
+
+  const [editingMarker, setEditingMarker] = useState<"start" | "end" | null>(null);
+  const [editableMarkerTime, setEditableMarkerTime] = useState("");
     
   return (
     <div className="flex flex-col glass-panel rounded-lg p-4 space-y-4 animate-fade-in">
@@ -148,8 +152,38 @@ export const MarkerControls = ({
                 <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
                 Marqueur début
               </div>
-              <div className="text-xs text-muted-foreground font-mono">
-                {formatTimeDetailed(startMarker.position)}
+              <div className="text-xs text-muted-foreground font-mono flex items-center space-x-2">
+                {editingMarker === "start" ? (
+                  <input
+                    type="text"
+                    value={editableMarkerTime}
+                    onChange={(e) => setEditableMarkerTime(e.target.value)}
+                    onBlur={() => {
+                      const newTime = parseTimeString(editableMarkerTime);
+                      if (!isNaN(newTime)) {
+                        startMarker.position = newTime; // Or call a setter
+                      }
+                      setEditingMarker(null);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") e.currentTarget.blur();
+                      if (e.key === "Escape") setEditingMarker(null);
+                    }}
+                    autoFocus
+                    className="bg-transparent border-b border-muted outline-none w-20"
+                  />
+                ) : (
+                  <span 
+                    onClick={() => {
+                      setEditableMarkerTime(formatTimeDetailed(startMarker.position));
+                      setEditingMarker("start");
+                    }}
+                    className="cursor-text flex items-center hover:text-foreground/80 hover:underline cursor-pointer"
+                  >
+                    {formatTimeDetailed(startMarker.position)}
+                    <Pencil className="h-3 w-3 ml-2 text-muted-foreground" />
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -162,8 +196,38 @@ export const MarkerControls = ({
                 <div className="w-2 h-2 rounded-full bg-red-500 mr-2"></div>
                 Marqueur fin
               </div>
-              <div className="text-xs text-muted-foreground font-mono">
-                {formatTimeDetailed(endMarker.position)}
+              <div className="text-xs text-muted-foreground font-mono flex items-center space-x-2">
+                {editingMarker === "end" ? (
+                  <input
+                    type="text"
+                    value={editableMarkerTime}
+                    onChange={(e) => setEditableMarkerTime(e.target.value)}
+                    onBlur={() => {
+                      const newTime = parseTimeString(editableMarkerTime);
+                      if (!isNaN(newTime)) {
+                        endMarker.position = newTime; // Or call a setter
+                      }
+                      setEditingMarker(null);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") e.currentTarget.blur();
+                      if (e.key === "Escape") setEditingMarker(null);
+                    }}
+                    autoFocus
+                    className="bg-transparent border-b border-muted outline-none w-20"
+                  />
+                ) : (
+                  <span
+                    onClick={() => {
+                      setEditableMarkerTime(formatTimeDetailed(endMarker.position));
+                      setEditingMarker("end");
+                    }}
+                    className="cursor-text flex items-center hover:text-foreground/80 hover:underline cursor-pointer"
+                  >
+                    {formatTimeDetailed(endMarker.position)}
+                    <Pencil className="h-3 w-3 ml-2 text-muted-foreground" />
+                  </span>
+                )}
               </div>
             </div>
           </div>
