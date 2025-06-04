@@ -3,6 +3,7 @@ import { useState, useCallback, memo, useEffect, useRef } from "react";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { AudioMarker } from "@/hooks/useAudio";
+import { parseTimeString } from "@/utils/timeParser";
 import { 
   Play, 
   Pause, 
@@ -12,7 +13,8 @@ import {
   Music,
   ChevronsLeft,
   ChevronsRight,
-  Loader2
+  Loader2,
+  Pencil
 } from "lucide-react";
 import {
   Tooltip,
@@ -59,6 +61,18 @@ export const AudioPlayer = memo(({
   const playButtonRef = useRef<HTMLButtonElement>(null);
   
   const playbackPercentage = duration > 0 ? (currentTime / duration) * 100 : 0;
+  
+  // State to manage editing time display
+  const [isEditingTime, setIsEditingTime] = useState(false);
+  const [editableTime, setEditableTime] = useState(formatTime(currentTime));
+
+  // Find IN and OUT markers
+  const inMarker = markers.find(m => m.type === "start");
+  const outMarker = markers.find(m => m.type === "end");
+
+  // Calculate percentages for IN and OUT markers
+  const inPercent = inMarker ? (inMarker.position / duration) * 100 : 0;
+  const outPercent = outMarker ? (outMarker.position / duration) * 100 : 0;
   
   // Enable playback controls once audio is loaded
   useEffect(() => {
@@ -134,7 +148,7 @@ export const AudioPlayer = memo(({
     };
   
     audioEl.addEventListener("timeupdate", stopListener);
-  }, [audioRef, markers, duration]);  
+  }, [audioRef, markers, duration]);
 
   return (
     <div className="glass-panel rounded-lg p-4 animate-fade-in">
@@ -182,17 +196,93 @@ export const AudioPlayer = memo(({
       
       <div className="flex flex-col space-y-4">
         <div className="space-y-1.5">
-          <Slider
-            value={[playbackPercentage]}
-            min={0}
-            max={100}
-            step={0.1}
-            onValueChange={(value) => onSeek((value[0] / 100) * duration)}
-            disabled={!playbackEnabled || isLoading}
-            className="cursor-pointer"
-          />
+          <div className="relative w-full">
+            {/* Slider */}
+            <Slider
+              value={[playbackPercentage]}
+              min={0}
+              max={100}
+              step={0.1}
+              onValueChange={(value) => onSeek((value[0] / 100) * duration)}
+              disabled={!playbackEnabled || isLoading}
+              className="relative z-10"
+            />
+
+            {/* Horizontal line under the slider between IN and OUT */}
+            {inMarker && outMarker && inPercent < outPercent && (
+              <div
+                className="absolute h-1 bg-green-500 rounded bottom-0"
+                style={{
+                  left: `${inPercent}%`,
+                  width: `${outPercent - inPercent}%`,
+                  transform: "translateY(4px)", // push line below slider (adjust as needed)
+                  pointerEvents: "none",
+                  zIndex: 0,
+                }}
+              />
+            )}
+
+            {/* IN marker line */}
+            {inMarker && (
+              <div
+                className="absolute w-[2px] h-4 bg-green-700 bottom-0"
+                style={{
+                  left: `${inPercent}%`,
+                  transform: "translate(-50%, 4px)", // center horizontally, push down vertically
+                  pointerEvents: "none",
+                  zIndex: 5,
+                  borderRadius: "1px",
+                }}
+              />
+            )}
+
+            {/* OUT marker line */}
+            {outMarker && (
+              <div
+                className="absolute w-[2px] h-4 bg-red-700 bottom-0"
+                style={{
+                  left: `${outPercent}%`,
+                  transform: "translate(-50%, 4px)",
+                  pointerEvents: "none",
+                  zIndex: 5,
+                  borderRadius: "1px",
+                }}
+              />
+            )}
+          </div>
           <div className="flex justify-between text-xs text-muted-foreground">
-            <span>{formatTime(currentTime)}</span>
+            {isEditingTime ? (
+              <input
+                type="text"
+                value={editableTime}
+                onChange={(e) => setEditableTime(e.target.value)}
+                onBlur={() => {
+                  const time = parseTimeString(editableTime);
+                  if (!isNaN(time)) {
+                    onSeek(Math.min(Math.max(0, time), duration));
+                  }
+                  setIsEditingTime(false);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.currentTarget.blur();
+                  }
+                }}
+                autoFocus
+                className="w-16 bg-transparent border-b border-muted outline-none text-muted-foreground text-xs"
+              />
+            ) : (
+              <span
+                onClick={() => {
+                  setEditableTime(formatTime(currentTime));
+                  setIsEditingTime(true);
+                }}
+                className="cursor-text flex items-center gap-2 hover:text-foreground/80 hover:underline cursor-pointer"
+              >
+                {formatTime(currentTime)}
+                <Pencil className="w-3 h-3 text-muted-foreground" />
+              </span>
+            )}
             <span>{formatTime(duration)}</span>
           </div>
         </div>
