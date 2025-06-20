@@ -67,6 +67,20 @@ const Index = () => {
     }
   };
 
+  const handleDownloadFullAudio = () => {
+    if (!audioRef.current || !currentAudioFile || !audioRef.current.src) return;
+
+    const audioSrc = audioRef.current.src;
+    const link = document.createElement("a");
+    link.href = audioSrc;
+    link.download = currentAudioFile.name;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+
+
   if (!settings) {
     return (
       <div className="h-screen flex items-center justify-center bg-background">
@@ -145,7 +159,15 @@ const Index = () => {
 
           <div className="h-fit">
             {currentAudioFile && !showMarkerControls && (
-              <div className="flex justify-end mb-4">
+              <div className="flex justify-end space-x-2 mb-4">
+                <Button 
+                  onClick={handleDownloadFullAudio}
+                  variant="outline"
+                  className="animate-fade-in"
+                >
+                  Télécharger Audio Complet
+                </Button>
+
                 <Button 
                   onClick={() => setShowMarkerControls(true)}
                   className="animate-fade-in"
