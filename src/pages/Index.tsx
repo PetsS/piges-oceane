@@ -94,14 +94,14 @@ const Index = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <header className="bg-[#ffcc00]/100 border-b py-4 px-6">
+      <header className="bg-[#66ccff]/100 border-b py-4 px-6">
         <div className="flex flex-col-md:flex-row items-center justify-between">
           <img
-            src="img/hw_logo.webp"
+            src="img/oc_logo.webp"
             alt="Logo"
             className="h-10 w-10"
           />
-          <div className="flex items-center space-x-2 mt-2 md:mt-0">
+          <div className="flex items-center space-x-2">
           <h1 className="text-2xl font-bold">
             <span>Pige</span>
           </h1>
