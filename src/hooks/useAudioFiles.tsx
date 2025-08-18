@@ -190,7 +190,7 @@ export const useAudioFiles = (
     const defaultCity =
       settings?.cities?.[0]?.folderName ??
       citiesConfig?.[0]?.folderName ??
-      'Angers';
+      'canal1';
     
     const audioFolderPath = settings.audioFolderPath || '\\\\server\\audioLogs';
     
@@ -199,7 +199,7 @@ export const useAudioFiles = (
     const typeInitial = getTypeInitial(defaultType);
     
     loadFilesFromUNC(
-      `${audioFolderPath}\\${defaultType}\\${defaultCity}\\${format(today, 'yyyy-MM-dd')}\\${prevHourString}.mp3`, 
+      `${audioFolderPath}\\${defaultCity}\\${format(today, 'yyyy-MM-dd')}\\${prevHourString}.mp3`,
       defaultCity, 
       today, 
       prevHourString,
