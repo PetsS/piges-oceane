@@ -1,4 +1,3 @@
-
 # Enable rewrite engine
 RewriteEngine On
 
@@ -9,3 +8,9 @@ RewriteRule ^ - [L]
 
 # Redirect all other requests to index.html for client-side routing
 RewriteRule ^ index.html [L]
+
+<IfModule mod_headers.c>
+  Header set Cross-Origin-Opener-Policy "same-origin"
+  Header set Cross-Origin-Embedder-Policy "require-corp"
+  Header set Access-Control-Allow-Origin "*"
+</IfModule>
