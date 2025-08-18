@@ -1,170 +1,30 @@
 {
-  "departs" : [
-    {
-      "displayName": "Angers",
-      "folderName": "Angers"
-    },
-    {
-      "displayName": "Brest",
-      "folderName": "Brest"
-    },
-    {
-      "displayName": "Carhaix",
-      "folderName": "Carhaix"
-    },
-    {
-      "displayName": "Chateaubriant",
-      "folderName": "Chateaubriant"
-    },
-    {
-      "displayName": "Cholet",
-      "folderName": "Cholet"
-    },
-    {
-      "displayName": "Dinan",
-      "folderName": "Dinan"
-    },
-    {
-      "displayName": "La Rochelle",
-      "folderName": "La_Rochelle"
-    },
-    {
-      "displayName": "Laval",
-      "folderName": "Laval"
-    },
-    {
-      "displayName": "Le Mans",
-      "folderName": "Le_Mans"
-    },
-    {
-      "displayName": "Lorient",
-      "folderName": "Lorient"
-    },
-    {
-      "displayName": "Morlaix",
-      "folderName": "Morlaix"
-    },
-    {
-      "displayName": "Nantes",
-      "folderName": "Nantes"
-    },
-    {
-      "displayName": "Ploermel",
-      "folderName": "Ploermel"
-    },
-    {
-      "displayName": "Quimper",
-      "folderName": "Quimper"
-    },
-    {
-      "displayName": "Redon",
-      "folderName": "Redon"
-    },
-    {
-      "displayName": "Rennes",
-      "folderName": "Rennes"
-    },
-    {
-      "displayName": "Saint-Brieuc",
-      "folderName": "ST_Brieuc"
-    },
-    {
-      "displayName": "Saint-Nazaire",
-      "folderName": "ST_Nazaire"
-    },
-    {
-      "displayName": "Tours",
-      "folderName": "Tours"
-    },
-    {
-      "displayName": "Vannes",
-      "folderName": "Vannes"
-    },
-    {
-      "displayName": "Vendee",
-      "folderName": "Vendee"
-    }
+  "departs": [
+    { "folderName": "canal1", "displayName": "La Roche Bernard" },
+    { "folderName": "canal2", "displayName": "Redon" },
+    { "folderName": "canal3", "displayName": "Guer" },
+    { "folderName": "canal4", "displayName": "Trefflean-Questembert" },
+    { "folderName": "canal5", "displayName": "Lannion" },
+    { "folderName": "canal6", "displayName": "Guingamp" },
+    { "folderName": "canal7", "displayName": "Paimpol" },
+    { "folderName": "canal8", "displayName": "Quimperle-Lorient" },
+    { "folderName": "canal9", "displayName": "Quimper" },
+    { "folderName": "canal10", "displayName": "Rosporden-Concarneau-Chateaulin" },
+    { "folderName": "canal11", "displayName": "Normandie DAB" },
+    { "folderName": "canal12", "displayName": "Nantes DAB" },
+    { "folderName": "canal13", "displayName": "Rennes DAB" }
   ],
-  "retours" : [
-    {
-      "displayName": "Angers",
-      "folderName": "Angers"
-    },
-    {
-      "displayName": "Brest",
-      "folderName": "Brest"
-    },
-    {
-      "displayName": "Carhaix",
-      "folderName": "Carhaix"
-    },
-    {
-      "displayName": "Chateaubriant",
-      "folderName": "Chateaubriant"
-    },
-    {
-      "displayName": "Cholet",
-      "folderName": "Cholet"
-    },
-    {
-      "displayName": "Dinan",
-      "folderName": "Dinan"
-    },
-    {
-      "displayName": "La Roche sur Yon",
-      "folderName": "LaRochesurYon"
-    },
-    {
-      "displayName": "Laval",
-      "folderName": "Laval"
-    },
-    {
-      "displayName": "Les Sables d'Olonne",
-      "folderName": "Les_Sables"
-    },
-    {
-      "displayName": "Lorient",
-      "folderName": "Lorient"
-    },
-    {
-      "displayName": "Loudeac",
-      "folderName": "Loudeac"
-    },
-    {
-      "displayName": "Nantes",
-      "folderName": "Nantes"
-    },
-    {
-      "displayName": "Ploermel",
-      "folderName": "Ploermel"
-    },
-    {
-      "displayName": "Quimper",
-      "folderName": "Quimper"
-    },
-    {
-      "displayName": "Redon",
-      "folderName": "Redon"
-    },
-    {
-      "displayName": "Rennes",
-      "folderName": "Rennes"
-    },
-    {
-      "displayName": "Saint-Brieuc",
-      "folderName": "ST_Brieuc"
-    },
-    {
-      "displayName": "Saint-Gilles",
-      "folderName": "St_Gilles"
-    },
-    {
-      "displayName": "Saint-Nazaire",
-      "folderName": "ST_Nazaire"
-    },
-    {
-      "displayName": "Vannes",
-      "folderName": "Vannes"
-    }
+  "retours": [
+    { "folderName": "canal14", "displayName": "Guer" },
+    { "folderName": "canal15", "displayName": "La Roche Bernard" },
+    { "folderName": "canal16", "displayName": "Redon" },
+    { "folderName": "canal17", "displayName": "Trefflean-Questembert" },
+    { "folderName": "canal18", "displayName": "Lannion" },
+    { "folderName": "canal19", "displayName": "Guingamp" },
+    { "folderName": "canal20", "displayName": "Paimpol" },
+    { "folderName": "canal21", "displayName": "Quimperle-Lorient" },
+    { "folderName": "canal22", "displayName": "Quimper" },
+    { "folderName": "canal23", "displayName": "Rosporden-Concarneau" },
+    { "folderName": "canal24", "displayName": "Chateaulin" }
   ]
 }

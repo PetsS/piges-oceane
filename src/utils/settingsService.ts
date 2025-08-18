@@ -7,7 +7,10 @@ export interface Settings {
   headerTitle: string;
   logoUrl: string | null;
   enableNotifications: boolean;
-  cities: CityFolder[];
+  cities: {
+    departs: CityFolder[];
+    retours: CityFolder[];
+  };
   audioFolderPath: string;
   buttonColors: {
     primary: string;
@@ -28,7 +31,7 @@ const defaultSettings: Settings = {
   headerTitle: 'Audio Marker Interface',
   logoUrl: null,
   enableNotifications: true,
-  cities: citiesConfig.departs, // Default to depart cities
+  cities: citiesConfig,
   audioFolderPath: '/audio',
   buttonColors: {
     primary: '#1F4A4F',
@@ -57,7 +60,9 @@ export const getSettings = async (): Promise<Settings> => {
               ...(parsed.buttonColors || {})
             },
             // Ensure we always have cities data
-            cities: parsed.cities && parsed.cities.length > 0 ? parsed.cities : citiesConfig
+            cities: parsed.cities && Object.keys(parsed.cities).length > 0
+              ? parsed.cities
+              : citiesConfig
           });
           return;
         } catch (e) {

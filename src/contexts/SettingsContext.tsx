@@ -25,9 +25,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       setIsLoading(true);
       const fetchedSettings = await getSettings();
       // Ensure we use the cities from the configuration file if not available in fetched settings
-      if (!fetchedSettings.cities || fetchedSettings.cities.length === 0) {
-        fetchedSettings.cities = citiesConfig.departs // Default to depart cities
-      }
+      if (!fetchedSettings.cities || Object.keys(fetchedSettings.cities).length === 0) {
+        fetchedSettings.cities = citiesConfig; // Includes both departs and retours
+}
       setSettings(fetchedSettings);
       
       // Apply theme immediately and then again after a delay

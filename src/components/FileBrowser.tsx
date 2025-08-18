@@ -40,7 +40,7 @@ export const FileBrowser = ({
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedHour, setSelectedHour] = useState<string | null>(null);
   const [audioFolderPath, setAudioFolderPath] = useState("/audio");
-  const [selectedCityFolder, setSelectedCityFolder] = useState<string>(citiesConfig[0]?.folderName || "Angers");
+  const [selectedCityFolder, setSelectedCityFolder] = useState<string>(citiesConfig.departs[0]?.folderName || "canal1");
   const [selectedType, setSelectedType] = useState<string>(typesConfig[0]?.folderName || "Départs");
   const [cities, setCities] = useState<CityFolder[]>(citiesConfig.departs);
   const [types, setTypes] = useState(typesConfig);
@@ -66,40 +66,26 @@ export const FileBrowser = ({
       setIsLocalPath(!settings.audioFolderPath.startsWith('\\\\'));
     }
     
-    // Use cities from settings if available, otherwise use from config file
-    if (settings && settings.cities && settings.cities.length > 0) {
-      setCities(settings.cities);
-      setSelectedCityFolder(settings.cities[0]?.folderName || citiesConfig[0]?.folderName);
-    }
   }, [settings]);
 
   // Update cities based on selected type and settings
   useEffect(() => {
-    const isDeparts = selectedType.toLowerCase().includes("depart");
+    const selectedTypeConfig = types.find((type) => type.folderName === selectedType);
+    const isDeparts = selectedTypeConfig?.initial === "D";
   
+    // Use from settings if available, otherwise fallback to config
     const selectedCities =
-      settings && settings.cities && settings.cities.length > 0
-        ? settings.cities
-        : isDeparts
-        ? citiesConfig.departs
-        : citiesConfig.retours;
-  
+      isDeparts
+        ? settings?.cities?.departs ?? citiesConfig.departs
+        : settings?.cities?.retours ?? citiesConfig.retours;
+
+
     setCities(selectedCities);
-    setSelectedCityFolder(selectedCities[0]?.folderName || "Angers");
+    setSelectedCityFolder(selectedCities[0]?.folderName || "");
   }, [selectedType, settings]);
-  
-  // Update selected city folder when cities change
-  useEffect(() => {
-    const typeLower = selectedType.toLowerCase();
-    if (typeLower.includes("retour")) {
-      setCities(citiesConfig.retours);
-    } else {
-      setCities(citiesConfig.departs);
-    }
-  }, [selectedType]);
 
   const handleSearch = () => {
-    if (!selectedDate) return;
+    if (!selectedCityFolder || !selectedDate) return;
     
     // Format date as YYYY-MM-DD for folder structure
     const dateFolder = format(selectedDate, "yyyy-MM-dd");
@@ -110,10 +96,10 @@ export const FileBrowser = ({
     
     if (isLocalPath) {
       // For local paths, construct the path without doubling the backslashes
-      fullPath = `${audioFolderPath}/${selectedType}/${selectedCityFolder}/${dateFolder}${selectedHour ? `/${selectedHour}.mp3` : ''}`;
+      fullPath = `${audioFolderPath}/${selectedCityFolder}/${dateFolder}${selectedHour ? `/${selectedHour}.mp3` : ''}`;
     } else {
       // For network paths (UNC), ensure the format starts with double backslashes
-      fullPath = `${audioFolderPath}\\${selectedType}\\${selectedCityFolder}\\${dateFolder}${selectedHour ? `\\${selectedHour}.mp3` : ''}`;
+      fullPath = `${audioFolderPath}\\${selectedCityFolder}\\${dateFolder}${selectedHour ? `\\${selectedHour}.mp3` : ''}`;
     }
 
     onPathChange(fullPath, selectedCityFolder, selectedDate, selectedHour, typeInitial);
